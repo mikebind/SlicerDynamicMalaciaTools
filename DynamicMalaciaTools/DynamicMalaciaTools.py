@@ -29,25 +29,30 @@ class DynamicMalaciaTools(ScriptedLoadableModule):
 
     def __init__(self, parent):
         ScriptedLoadableModule.__init__(self, parent)
-        self.parent.title = _("DynamicMalaciaTools")  # TODO: make this more human readable by adding spaces
+        self.parent.title = _("Dynamic Malacia Tools")
         # TODO: set categories (folders where the module shows up in the module selector)
-        self.parent.categories = [translate("qSlicerAbstractCoreModule", "Examples")]
-        self.parent.dependencies = []  # TODO: add here list of module names that this module requires
-        self.parent.contributors = ["John Doe (AnyWare Corp.)"]  # TODO: replace with "Firstname Lastname (Organization)"
+        self.parent.categories = [translate("qSlicerAbstractCoreModule", "Airway")]
+        self.parent.dependencies = [
+            "CrossSectionAnalysis"
+        ]  # TODO: add here list of module names that this module requires
+        self.parent.contributors = [
+            "Mike Bindschadler (Seattle Children's Hospital)"
+        ]  # TODO: replace with "Firstname Lastname (Organization)"
         # TODO: update with short description of the module and a link to online module documentation
         # _() function marks text as translatable to other languages
-        self.parent.helpText = _("""
-This is an example of scripted loadable module bundled in an extension.
-See more information in <a href="https://github.com/organization/projectname#DynamicMalaciaTools">module documentation</a>.
-""")
-        # TODO: replace with organization, grant and thanks
-        self.parent.acknowledgementText = _("""
-This file was originally developed by Jean-Christophe Fillion-Robin, Kitware Inc., Andras Lasso, PerkLab,
-and Steve Pieper, Isomics, Inc. and was partially funded by NIH grant 3P41RR013218-12S1.
-""")
-
-        # Additional initialization step after application startup is complete
-        slicer.app.connect("startupCompleted()", registerSampleData)
+        self.parent.helpText = _(
+            """This module provides some tools for analyzing tracheal malacia in 4D-CT imaging.
+See more information in <a href="https://github.com/mikebind/SlicerDynamicMalaciaTools">module repository</a>.
+"""
+        )
+        self.parent.acknowledgementText = _(
+            """
+This file was originally developed by Mike Bindschadler as part of work at Seattle Children's Hospital.
+"""
+        )
+        # Skip sample data registration for now (until we have a sample data set we want to use)
+        ### # Additional initialization step after application startup is complete
+        ### slicer.app.connect("startupCompleted()", registerSampleData)
 
 
 #
@@ -164,8 +169,12 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
         # Connections
 
         # These connections ensure that we update parameter node when scene is closed
-        self.addObserver(slicer.mrmlScene, slicer.mrmlScene.StartCloseEvent, self.onSceneStartClose)
-        self.addObserver(slicer.mrmlScene, slicer.mrmlScene.EndCloseEvent, self.onSceneEndClose)
+        self.addObserver(
+            slicer.mrmlScene, slicer.mrmlScene.StartCloseEvent, self.onSceneStartClose
+        )
+        self.addObserver(
+            slicer.mrmlScene, slicer.mrmlScene.EndCloseEvent, self.onSceneEndClose
+        )
 
         # Buttons
         self.ui.applyButton.connect("clicked(bool)", self.onApplyButton)
@@ -188,7 +197,9 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
         if self._parameterNode:
             self._parameterNode.disconnectGui(self._parameterNodeGuiTag)
             self._parameterNodeGuiTag = None
-            self.removeObserver(self._parameterNode, vtk.vtkCommand.ModifiedEvent, self._checkCanApply)
+            self.removeObserver(
+                self._parameterNode, vtk.vtkCommand.ModifiedEvent, self._checkCanApply
+            )
 
     def onSceneStartClose(self, caller, event) -> None:
         """Called just before the scene is closed."""
@@ -210,11 +221,15 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
 
         # Select default input nodes if nothing is selected yet to save a few clicks for the user
         if not self._parameterNode.inputVolume:
-            firstVolumeNode = slicer.mrmlScene.GetFirstNodeByClass("vtkMRMLScalarVolumeNode")
+            firstVolumeNode = slicer.mrmlScene.GetFirstNodeByClass(
+                "vtkMRMLScalarVolumeNode"
+            )
             if firstVolumeNode:
                 self._parameterNode.inputVolume = firstVolumeNode
 
-    def setParameterNode(self, inputParameterNode: Optional[DynamicMalaciaToolsParameterNode]) -> None:
+    def setParameterNode(
+        self, inputParameterNode: Optional[DynamicMalaciaToolsParameterNode]
+    ) -> None:
         """
         Set and observe parameter node.
         Observation is needed because when the parameter node is changed then the GUI must be updated immediately.
@@ -222,17 +237,25 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
 
         if self._parameterNode:
             self._parameterNode.disconnectGui(self._parameterNodeGuiTag)
-            self.removeObserver(self._parameterNode, vtk.vtkCommand.ModifiedEvent, self._checkCanApply)
+            self.removeObserver(
+                self._parameterNode, vtk.vtkCommand.ModifiedEvent, self._checkCanApply
+            )
         self._parameterNode = inputParameterNode
         if self._parameterNode:
             # Note: in the .ui file, a Qt dynamic property called "SlicerParameterName" is set on each
             # ui element that needs connection.
             self._parameterNodeGuiTag = self._parameterNode.connectGui(self.ui)
-            self.addObserver(self._parameterNode, vtk.vtkCommand.ModifiedEvent, self._checkCanApply)
+            self.addObserver(
+                self._parameterNode, vtk.vtkCommand.ModifiedEvent, self._checkCanApply
+            )
             self._checkCanApply()
 
     def _checkCanApply(self, caller=None, event=None) -> None:
-        if self._parameterNode and self._parameterNode.inputVolume and self._parameterNode.thresholdedVolume:
+        if (
+            self._parameterNode
+            and self._parameterNode.inputVolume
+            and self._parameterNode.thresholdedVolume
+        ):
             self.ui.applyButton.toolTip = _("Compute output volume")
             self.ui.applyButton.enabled = True
         else:
@@ -241,16 +264,27 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
 
     def onApplyButton(self) -> None:
         """Run processing when user clicks "Apply" button."""
-        with slicer.util.tryWithErrorDisplay(_("Failed to compute results."), waitCursor=True):
+        with slicer.util.tryWithErrorDisplay(
+            _("Failed to compute results."), waitCursor=True
+        ):
             # Compute output
-            self.logic.process(self.ui.inputSelector.currentNode(), self.ui.outputSelector.currentNode(),
-                               self.ui.imageThresholdSliderWidget.value, self.ui.invertOutputCheckBox.checked)
+            self.logic.process(
+                self.ui.inputSelector.currentNode(),
+                self.ui.outputSelector.currentNode(),
+                self.ui.imageThresholdSliderWidget.value,
+                self.ui.invertOutputCheckBox.checked,
+            )
 
             # Compute inverted output (if needed)
             if self.ui.invertedOutputSelector.currentNode():
                 # If additional output volume is selected then result with inverted threshold is written there
-                self.logic.process(self.ui.inputSelector.currentNode(), self.ui.invertedOutputSelector.currentNode(),
-                                   self.ui.imageThresholdSliderWidget.value, not self.ui.invertOutputCheckBox.checked, showResult=False)
+                self.logic.process(
+                    self.ui.inputSelector.currentNode(),
+                    self.ui.invertedOutputSelector.currentNode(),
+                    self.ui.imageThresholdSliderWidget.value,
+                    not self.ui.invertOutputCheckBox.checked,
+                    showResult=False,
+                )
 
 
 #
@@ -275,12 +309,14 @@ class DynamicMalaciaToolsLogic(ScriptedLoadableModuleLogic):
     def getParameterNode(self):
         return DynamicMalaciaToolsParameterNode(super().getParameterNode())
 
-    def process(self,
-                inputVolume: vtkMRMLScalarVolumeNode,
-                outputVolume: vtkMRMLScalarVolumeNode,
-                imageThreshold: float,
-                invert: bool = False,
-                showResult: bool = True) -> None:
+    def process(
+        self,
+        inputVolume: vtkMRMLScalarVolumeNode,
+        outputVolume: vtkMRMLScalarVolumeNode,
+        imageThreshold: float,
+        invert: bool = False,
+        showResult: bool = True,
+    ) -> None:
         """
         Run the processing algorithm.
         Can be used without GUI widget.
@@ -306,7 +342,13 @@ class DynamicMalaciaToolsLogic(ScriptedLoadableModuleLogic):
             "ThresholdValue": imageThreshold,
             "ThresholdType": "Above" if invert else "Below",
         }
-        cliNode = slicer.cli.run(slicer.modules.thresholdscalarvolume, None, cliParams, wait_for_completion=True, update_display=showResult)
+        cliNode = slicer.cli.run(
+            slicer.modules.thresholdscalarvolume,
+            None,
+            cliParams,
+            wait_for_completion=True,
+            update_display=showResult,
+        )
         # We don't need the CLI module node anymore, remove it to not clutter the scene with it
         slicer.mrmlScene.RemoveNode(cliNode)
 
