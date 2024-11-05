@@ -133,12 +133,6 @@ class DynamicMalaciaToolsParameterNode:
     invertedVolume - The output volume that will contain the inverted thresholded volume.
     """
 
-    inputVolume: vtkMRMLScalarVolumeNode
-    imageThreshold: Annotated[float, WithinRange(-100, 500)] = 100
-    invertThreshold: bool = False
-    thresholdedVolume: vtkMRMLScalarVolumeNode
-    invertedVolume: vtkMRMLScalarVolumeNode
-
     centerlineNode: vtkMRMLMarkupsCurveNode
     segmentationSequence: vtkMRMLSequenceNode
     segmentName: Optional[str] = None
@@ -234,7 +228,6 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
             "clicked(bool)", self.onRunSingleCSAButtonClick
         )
         self.ui.runCSAAnalysisButton.connect("clicked(bool)", self.onRunCSAButtonClick)
-        self.ui.applyButton.connect("clicked(bool)", self.onApplyButton)
 
         # Make sure parameter node is initialized (needed for module reload)
         self.initializeParameterNode()
@@ -402,12 +395,12 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
         self.setParameterNode(self.logic.getParameterNode())
 
         # Select default input nodes if nothing is selected yet to save a few clicks for the user
-        if not self._parameterNode.inputVolume:
-            firstVolumeNode = slicer.mrmlScene.GetFirstNodeByClass(
-                "vtkMRMLScalarVolumeNode"
-            )
-            if firstVolumeNode:
-                self._parameterNode.inputVolume = firstVolumeNode
+        # if not self._parameterNode.inputVolume:
+        #    firstVolumeNode = slicer.mrmlScene.GetFirstNodeByClass(
+        #        "vtkMRMLScalarVolumeNode"
+        #    )
+        #    if firstVolumeNode:
+        #        self._parameterNode.inputVolume = firstVolumeNode
 
     def setParameterNode(
         self, inputParameterNode: Optional[DynamicMalaciaToolsParameterNode]
@@ -435,42 +428,19 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
     def _checkCanApply(self, caller=None, event=None) -> None:
         if (
             self._parameterNode
-            and self._parameterNode.inputVolume
-            and self._parameterNode.thresholdedVolume
+            and self._parameterNode.centerlineNode
+            and self._parameterNode.segmentationSequence
+            and self._parameterNode.segmentName
         ):
-            self.ui.applyButton.toolTip = _("Compute output volume")
-            self.ui.applyButton.enabled = True
-        else:
-            self.ui.applyButton.toolTip = _("Select input and output volume nodes")
-            self.ui.applyButton.enabled = False
-
-    def onRunCSAAnalysisButtonClick(self) -> None:
-        """Run the cross-section analysis"""
-        self._parameterNode
-
-    def onApplyButton(self) -> None:
-        """Run processing when user clicks "Apply" button."""
-        with slicer.util.tryWithErrorDisplay(
-            _("Failed to compute results."), waitCursor=True
-        ):
-            # Compute output
-            self.logic.process(
-                self.ui.inputSelector.currentNode(),
-                self.ui.outputSelector.currentNode(),
-                self.ui.imageThresholdSliderWidget.value,
-                self.ui.invertOutputCheckBox.checked,
+            self.ui.runCSAAnalysisButton.toolTip = _(
+                "Run cross-section analysis across all frames"
             )
-
-            # Compute inverted output (if needed)
-            if self.ui.invertedOutputSelector.currentNode():
-                # If additional output volume is selected then result with inverted threshold is written there
-                self.logic.process(
-                    self.ui.inputSelector.currentNode(),
-                    self.ui.invertedOutputSelector.currentNode(),
-                    self.ui.imageThresholdSliderWidget.value,
-                    not self.ui.invertOutputCheckBox.checked,
-                    showResult=False,
-                )
+            self.ui.runCSAAnalysisButton.enabled = True
+        else:
+            self.ui.runCSAAnalysisButton.toolTip = _(
+                "Select centerline, segmentation sequence, and segment name to enable"
+            )
+            self.ui.runCSAAnalysisButton.enabled = False
 
 
 #
