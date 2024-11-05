@@ -7,14 +7,219 @@
     <x>0</x>
     <y>0</y>
     <width>325</width>
-    <height>311</height>
+    <height>613</height>
    </rect>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>
+    <widget class="ctkCollapsibleButton" name="CollapsibleButton">
+     <property name="text">
+      <string>Single Frame Tools</string>
+     </property>
+     <property name="collapsed">
+      <bool>true</bool>
+     </property>
+     <layout class="QFormLayout" name="formLayout">
+      <item row="2" column="0">
+       <widget class="QLabel" name="label_6">
+        <property name="text">
+         <string>Lumen Surface:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="qMRMLNodeComboBox" name="centerlineSelectorSingle">
+        <property name="nodeTypes">
+         <stringlist notr="true">
+          <string>vtkMRMLMarkupsCurveNode</string>
+         </stringlist>
+        </property>
+        <property name="hideChildNodeTypes">
+         <stringlist notr="true"/>
+        </property>
+        <property name="interactionNodeSingletonTag">
+         <string notr="true"/>
+        </property>
+        <property name="SlicerParameterName" stdset="0">
+         <string>centerlineNodeSingle</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="0">
+       <widget class="QLabel" name="label_7">
+        <property name="text">
+         <string>Centerline:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="4" column="0" colspan="2">
+       <widget class="QPushButton" name="runSingleCrossSectionalAnalysisButton">
+        <property name="text">
+         <string>Run Single CSA Analysis</string>
+        </property>
+       </widget>
+      </item>
+      <item row="3" column="1">
+       <widget class="qMRMLNodeComboBox" name="tableSelector">
+        <property name="nodeTypes">
+         <stringlist notr="true">
+          <string>vtkMRMLTableNode</string>
+         </stringlist>
+        </property>
+        <property name="hideChildNodeTypes">
+         <stringlist notr="true"/>
+        </property>
+        <property name="interactionNodeSingletonTag">
+         <string notr="true"/>
+        </property>
+        <property name="SlicerParameterName" stdset="0">
+         <string>singleSegmentOutputTableNode</string>
+        </property>
+       </widget>
+      </item>
+      <item row="3" column="0">
+       <widget class="QLabel" name="label_8">
+        <property name="text">
+         <string>Output Table</string>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="1">
+       <widget class="qMRMLSegmentSelectorWidget" name="SegmentSelectorWidget">
+        <property name="noneEnabled">
+         <bool>true</bool>
+        </property>
+        <property name="selectNodeUponCreation">
+         <bool>false</bool>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="ctkCollapsibleButton" name="CollapsibleButton_2">
+     <property name="text">
+      <string>Multiframe Tools</string>
+     </property>
+     <layout class="QFormLayout" name="formLayout_5">
+      <item row="0" column="0">
+       <widget class="QLabel" name="label_9">
+        <property name="text">
+         <string>Centerline:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="qMRMLNodeComboBox" name="centerlineSelectorNodeMulti">
+        <property name="nodeTypes">
+         <stringlist notr="true">
+          <string>vtkMRMLMarkupsCurveNode</string>
+         </stringlist>
+        </property>
+        <property name="hideChildNodeTypes">
+         <stringlist notr="true"/>
+        </property>
+        <property name="interactionNodeSingletonTag">
+         <string notr="true"/>
+        </property>
+        <property name="SlicerParameterName" stdset="0">
+         <string>centerlineNode</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="1">
+       <widget class="qMRMLNodeComboBox" name="segmentationSequenceSelector">
+        <property name="nodeTypes">
+         <stringlist notr="true">
+          <string>vtkMRMLSequenceNode</string>
+         </stringlist>
+        </property>
+        <property name="hideChildNodeTypes">
+         <stringlist notr="true"/>
+        </property>
+        <property name="noneEnabled">
+         <bool>true</bool>
+        </property>
+        <property name="interactionNodeSingletonTag">
+         <string notr="true"/>
+        </property>
+        <property name="selectNodeUponCreation">
+         <bool>false</bool>
+        </property>
+        <property name="SlicerParameterName" stdset="0">
+         <string>segmentationSequence</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="0">
+       <widget class="QLabel" name="label_10">
+        <property name="text">
+         <string>Segmentation Sequence:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="0">
+       <widget class="QLabel" name="label_11">
+        <property name="text">
+         <string>Segment Name</string>
+        </property>
+       </widget>
+      </item>
+      <item row="3" column="0">
+       <widget class="QLabel" name="label_12">
+        <property name="text">
+         <string>Output Table Sequence:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="3" column="1">
+       <widget class="qMRMLNodeComboBox" name="outputTableSequenceNodeSelector">
+        <property name="nodeTypes">
+         <stringlist notr="true">
+          <string>vtkMRMLSequenceNode</string>
+         </stringlist>
+        </property>
+        <property name="hideChildNodeTypes">
+         <stringlist notr="true"/>
+        </property>
+        <property name="noneEnabled">
+         <bool>true</bool>
+        </property>
+        <property name="renameEnabled">
+         <bool>true</bool>
+        </property>
+        <property name="interactionNodeSingletonTag">
+         <string notr="true"/>
+        </property>
+        <property name="selectNodeUponCreation">
+         <bool>false</bool>
+        </property>
+        <property name="noneDisplay">
+         <string>Create new Table Sequence</string>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="1">
+       <widget class="QComboBox" name="segmentNameComboBox"/>
+      </item>
+      <item row="4" column="0" colspan="2">
+       <widget class="QPushButton" name="runCSAAnalysisButton">
+        <property name="text">
+         <string>Run CSA Analysis</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
     <widget class="ctkCollapsibleButton" name="inputsCollapsibleButton">
      <property name="text">
       <string>Inputs</string>
+     </property>
+     <property name="collapsed">
+      <bool>true</bool>
      </property>
      <layout class="QFormLayout" name="formLayout_2">
       <item row="0" column="0">
@@ -84,6 +289,9 @@
     <widget class="ctkCollapsibleButton" name="outputsCollapsibleButton">
      <property name="text">
       <string>Outputs</string>
+     </property>
+     <property name="collapsed">
+      <bool>true</bool>
      </property>
      <layout class="QFormLayout" name="formLayout_4">
       <item row="0" column="0">
@@ -219,6 +427,17 @@
  </widget>
  <customwidgets>
   <customwidget>
+   <class>ctkCollapsibleButton</class>
+   <extends>QWidget</extends>
+   <header>ctkCollapsibleButton.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>ctkSliderWidget</class>
+   <extends>QWidget</extends>
+   <header>ctkSliderWidget.h</header>
+  </customwidget>
+  <customwidget>
    <class>qMRMLNodeComboBox</class>
    <extends>QWidget</extends>
    <header>qMRMLNodeComboBox.h</header>
@@ -230,15 +449,9 @@
    <container>1</container>
   </customwidget>
   <customwidget>
-   <class>ctkCollapsibleButton</class>
-   <extends>QWidget</extends>
-   <header>ctkCollapsibleButton.h</header>
-   <container>1</container>
-  </customwidget>
-  <customwidget>
-   <class>ctkSliderWidget</class>
-   <extends>QWidget</extends>
-   <header>ctkSliderWidget.h</header>
+   <class>qMRMLSegmentSelectorWidget</class>
+   <extends>qMRMLWidget</extends>
+   <header>qMRMLSegmentSelectorWidget.h</header>
   </customwidget>
  </customwidgets>
  <resources/>
@@ -288,6 +501,102 @@
     <hint type="destinationlabel">
      <x>173</x>
      <y>176</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>DynamicMalaciaTools</sender>
+   <signal>mrmlSceneChanged(vtkMRMLScene*)</signal>
+   <receiver>centerlineSelectorSingle</receiver>
+   <slot>setMRMLScene(vtkMRMLScene*)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>162</x>
+     <y>306</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>211</x>
+     <y>60</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>DynamicMalaciaTools</sender>
+   <signal>mrmlSceneChanged(vtkMRMLScene*)</signal>
+   <receiver>tableSelector</receiver>
+   <slot>setMRMLScene(vtkMRMLScene*)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>162</x>
+     <y>306</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>211</x>
+     <y>167</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>DynamicMalaciaTools</sender>
+   <signal>mrmlSceneChanged(vtkMRMLScene*)</signal>
+   <receiver>SegmentSelectorWidget</receiver>
+   <slot>setMRMLScene(vtkMRMLScene*)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>162</x>
+     <y>306</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>211</x>
+     <y>69</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>DynamicMalaciaTools</sender>
+   <signal>mrmlSceneChanged(vtkMRMLScene*)</signal>
+   <receiver>centerlineSelectorNodeMulti</receiver>
+   <slot>setMRMLScene(vtkMRMLScene*)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>162</x>
+     <y>306</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>237</x>
+     <y>257</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>DynamicMalaciaTools</sender>
+   <signal>mrmlSceneChanged(vtkMRMLScene*)</signal>
+   <receiver>segmentationSequenceSelector</receiver>
+   <slot>setMRMLScene(vtkMRMLScene*)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>162</x>
+     <y>306</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>237</x>
+     <y>286</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>DynamicMalaciaTools</sender>
+   <signal>mrmlSceneChanged(vtkMRMLScene*)</signal>
+   <receiver>outputTableSequenceNodeSelector</receiver>
+   <slot>setMRMLScene(vtkMRMLScene*)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>162</x>
+     <y>306</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>237</x>
+     <y>344</y>
     </hint>
    </hints>
   </connection>

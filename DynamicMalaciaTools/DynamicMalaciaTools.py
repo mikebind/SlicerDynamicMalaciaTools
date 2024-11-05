@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import Annotated, Optional
+from typing import Annotated, Optional, List, Tuple, Dict
 
 import vtk
 
@@ -14,9 +14,20 @@ from slicer.parameterNodeWrapper import (
     WithinRange,
 )
 
-from slicer import vtkMRMLScalarVolumeNode
+import numpy as np
+import re
+
+from slicer import (
+    vtkMRMLScalarVolumeNode,
+    vtkMRMLSegmentationNode,
+    vtkMRMLMarkupsCurveNode,
+    vtkMRMLSequenceNode,
+    vtkMRMLSequenceBrowserNode,
+    vtkMRMLTableNode,
+)
 
 
+SEGMENT_NAME_DIVIDER = "--Only Some Frames--"
 #
 # DynamicMalaciaTools
 #
@@ -128,6 +139,19 @@ class DynamicMalaciaToolsParameterNode:
     thresholdedVolume: vtkMRMLScalarVolumeNode
     invertedVolume: vtkMRMLScalarVolumeNode
 
+    centerlineNode: vtkMRMLMarkupsCurveNode
+    segmentationSequence: vtkMRMLSequenceNode
+    segmentName: Optional[str] = None
+    segmentFrames: Optional[List[int]] = None
+    outputTableSequence: Optional[vtkMRMLSequenceNode] = None
+
+    centerlineNodeSingle: vtkMRMLMarkupsCurveNode
+    singleSegmentationNode: vtkMRMLSegmentationNode
+    singleSegmentationSegmentID: (
+        str  # I think segmentIDs are equivalent to just strings
+    )
+    singleSegmentOutputTableNode: vtkMRMLTableNode
+
 
 #
 # DynamicMalaciaToolsWidget
@@ -166,7 +190,36 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
         # in batch mode, without a graphical user interface.
         self.logic = DynamicMalaciaToolsLogic()
 
+        # For the sequence node selectors, we want to restrict them so that
+        # they only show sequence nodes which hold the correct data node type
+        # Thankfully, this is already set as a MRML attribute, and we can filter
+        # by it!
+        self.ui.segmentationSequenceSelector.addAttribute(
+            "vtkMRMLSequenceNode", "DataNodeClassName", "vtkMRMLSegmentationNode"
+        )
+        self.ui.outputTableSequenceNodeSelector.addAttribute(
+            "vtkMRMLTableNode", "DataNodeClassName", "vtkMRMLTableNode"
+        )
+
         # Connections
+        # qMRMLSegmentSelectorWidgets cannot yet be handled via the parameter node
+        # wrapper, so must still be handled manually here
+        self.ui.SegmentSelectorWidget.connect(
+            "currentNodeChanged(vtkMRMLNode*)", self.onSingleSegmentationSelectionChange
+        )
+        self.ui.SegmentSelectorWidget.connect(
+            "currentSegmentChanged(QString)", self.onSingleSegmentSelectionChange
+        )
+        self.ui.segmentationSequenceSelector.connect(
+            "currentNodeChanged(vtkMRMLNode*)",
+            self.onSegmentationSequenceSelectorChange,
+        )
+        self.ui.segmentNameComboBox.connect(
+            "currentTextChanged(QString)", self.onSegmentNameChanged
+        )
+        self.ui.segmentNameComboBox.connect(
+            "activated(int)", self.onSegmentNameActivated
+        )
 
         # These connections ensure that we update parameter node when scene is closed
         self.addObserver(
@@ -177,10 +230,139 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
         )
 
         # Buttons
+        self.ui.runSingleCrossSectionalAnalysisButton.connect(
+            "clicked(bool)", self.onRunSingleCSAButtonClick
+        )
+        self.ui.runCSAAnalysisButton.connect("clicked(bool)", self.onRunCSAButtonClick)
         self.ui.applyButton.connect("clicked(bool)", self.onApplyButton)
 
         # Make sure parameter node is initialized (needed for module reload)
         self.initializeParameterNode()
+        # Make sure segment list is initialized if there is an
+        # initial segmentation sequence
+        self.onSegmentationSequenceSelectorChange(
+            self._parameterNode.segmentationSequence
+        )
+
+    def onSegmentNameChanged(self, txt):
+        """In the multiframe section, triggered whenever the text in the segment
+        name selection combobox changes"""
+        segmentName, segmentFrames = (
+            self.logic.processSegmentSelectorTextToNameAndFrames(txt)
+        )
+        self._parameterNode.segmentName = segmentName
+        self._parameterNode.segmentFrames = segmentFrames
+
+    def onSegmentNameActivated(self, num):
+        """In the multiframe section, triggered whenever a choice is made in the
+        segment name selection combobox. I'm including this because I want a way
+        to trigger updating even if nothing supposedly changes.
+        """
+        txt = self.ui.segmentNameComboBox.currentText
+        self.onSegmentNameChanged(txt)
+
+    def onRunSingleCSAButtonClick(self):
+        """Gather inputs and run the single segmentation cross sectional analysis"""
+        lumenNode = self._parameterNode.singleSegmentationNode
+        lumenSegmentID = self._parameterNode.singleSegmentationSegmentID
+        centerlineNode = self._parameterNode.centerlineNode
+        outputTableNode = self._parameterNode.singleSegmentOutputTableNode
+        if outputTableNode is None:
+            outputTableNode = slicer.mrmlScene.AddNewNodeByClass(
+                "vtkMRMLTableNode", "CSA_SingleOutputTable"
+            )
+            self._parameterNode.singleSegmentOutputTableNode = outputTableNode
+        print(f"LumenSeg: {lumenNode.GetName()}")
+        print(f"LumenSegID: {lumenSegmentID}")
+        self.logic.runCrossSectionalAnalysis(
+            centerlineNode, lumenNode, lumenSegmentID, outputTableNode
+        )
+
+    def onRunCSAButtonClick(self):
+        """Run cross-sectional analysis for all frames."""
+        pn = self._parameterNode
+        centerlineNode = pn.centerlineNode
+        segSeq = pn.segmentationSequence
+        segmentName = pn.segmentName
+        segmentFrames = pn.segmentFrames
+        outputTableSequence = pn.outputTableSequence
+        if outputTableSequence is None:
+            outputTableSequence = slicer.mrmlScene.AddNewNodeByClass(
+                "vtkMRMLSequenceNode", "CSA_TableSeq"
+            )
+            pn.outputTableSequence = outputTableSequence
+        # We should start with a clean slate even if there were prior tables
+        outputTableSequence.RemoveAllDataNodes()
+        self.logic.setCompatibleSeqIndexing(outputTableSequence, segSeq)
+
+        #
+        browserNode = (
+            slicer.modules.sequences.logic().GetFirstBrowserNodeForSequenceNode(segSeq)
+        )
+        nFrames = segSeq.GetNumberOfDataNodes()
+        if segmentFrames is None:
+            # all frames
+            frameIdxs = range(nFrames)
+        else:
+            # only certain frames
+            frameIdxs = [*segmentFrames]
+            slicer.util.warningDisplay(
+                "Sorry, this module currently only works for segments which are present in all frames!"
+            )
+            return
+        # Loop over frames
+        for frameIdx in frameIdxs:
+            browserNode.SetSelectedItemNumber(frameIdx)
+            lumenNode = browserNode.GetProxyNode(segSeq)
+            tempOutputTableNode = slicer.mrmlScene.AddNewNodeByClass(
+                "vtkMRMLTableNode", f"CSATableForFrame{frameIdx}"
+            )
+            self.logic.runCrossSectionalAnalysis(
+                centerlineNode, lumenNode, segmentName, tempOutputTableNode
+            )
+            indexValue = segSeq.GetNthIndexValue(frameIdx)
+            outputTableSequence.SetDataNodeAtValue(tempOutputTableNode, indexValue)
+            # Remove temp copy
+            slicer.mrmlScene.RemoveNode(tempOutputTableNode)
+            slicer.app.processEvents()
+        # Ensure outputTableSequence is linked to the browser node
+        if not browserNode.IsSynchronizedSequenceNode(outputTableSequence):
+            browserNode.AddSynchronizedSequenceNode(outputTableSequence)
+
+    def onSegmentationSequenceSelectorChange(self, newNode):
+        """User changed selection of segmentation sequence node.  The
+        list of options on the segment selection list must be updated
+        to match those avaiilable in the newly selected sequence
+        """
+        print(f"New segSeq is named {newNode.GetName() if newNode else 'NONE'}")
+        self._parameterNode.segmentationSequence = newNode
+        self.updateSegmentListSelector(newNode)
+
+    def updateSegmentListSelector(self, newSegmentationSequenceNode):
+        """Update the segment selector list based on the supplied
+        segmentation sequence node.  If empty, clear the options."""
+        if newSegmentationSequenceNode is None:
+            self.ui.segmentNameComboBox.clear()
+            return
+        segmentsList, partialSegmentDict = self.logic.getSegmentInfoFromSequence(
+            newSegmentationSequenceNode
+        )
+        # Build the selector list of options from the outputs
+        optionStrings = self.logic.buildOptionStrings(segmentsList, partialSegmentDict)
+        # Update the segment chooser combobox widget
+        self.logic.updateComboBoxOptions(self.ui.segmentNameComboBox, optionStrings)
+
+    def onSingleSegmentSelectionChange(self, newSegmentNameOrID):
+        """Triggered when a different segment name is chosen on the
+        single segmentation segment selector widget.
+        """
+        self._parameterNode.singleSegmentationSegmentID = newSegmentNameOrID
+
+    def onSingleSegmentationSelectionChange(self, newSegNode):
+        """Triggered when new segmentation node is selected on the
+        single segmentation segment selector widget.
+        """
+        self._parameterNode.singleSegmentationNode = newSegNode
 
     def cleanup(self) -> None:
         """Called when the application closes and the module widget is destroyed."""
@@ -262,6 +444,10 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
             self.ui.applyButton.toolTip = _("Select input and output volume nodes")
             self.ui.applyButton.enabled = False
 
+    def onRunCSAAnalysisButtonClick(self) -> None:
+        """Run the cross-section analysis"""
+        self._parameterNode
+
     def onApplyButton(self) -> None:
         """Run processing when user clicks "Apply" button."""
         with slicer.util.tryWithErrorDisplay(
@@ -309,6 +495,117 @@ class DynamicMalaciaToolsLogic(ScriptedLoadableModuleLogic):
     def getParameterNode(self):
         return DynamicMalaciaToolsParameterNode(super().getParameterNode())
 
+    def setCompatibleSeqIndexing(self, newSeqNode, seqNodeToMatch):
+        """Sets indexing to be compatible by matching the index
+        name, type, and units to match an existing sequence node.
+        This is necessary for them to share a single sequence browser
+        and be synchronized.
+        """
+        newSeqNode.SetIndexName(seqNodeToMatch.GetIndexName())
+        newSeqNode.SetIndexType(seqNodeToMatch.GetIndexType())
+        newSeqNode.SetIndexUnit(seqNodeToMatch.GetIndexUnit())
+
+    def getSegmentInfoFromSequence(
+        self, segmentationSequence: vtkMRMLSequenceNode
+    ) -> Tuple[List[str], Dict[str, List[int]]]:
+        """This is the first function I've ever had ChatGPT write and actually
+        used (with minimal modification after testing). It loops over the
+        elements of the input segmentation sequence node and examines which
+        segments are present in each frame. It returns a list of segments
+        which are present in every frame, and, separately, a dictionary
+        of segments which are present in only some frames, where the key
+        is the segment name, and the value is a list of the frames where
+        that segment name appears.
+        This function does NOT check that the segment ID is consistent, and
+        indeed, it may vary across frames, so segment IDs should always be
+        retrieved from the segment name in each frame.
+        """
+        # Initialize dictionaries to store segment presence across frames
+        segmentPresence = {}
+        totalFrames = segmentationSequence.GetNumberOfDataNodes()
+        # Iterate through each item in the sequence
+        for i in range(totalFrames):
+            # Get the segmentation node from the sequence
+            segmentationNode = segmentationSequence.GetNthDataNode(i)
+            # Get the segmentation object
+            segmentation = segmentationNode.GetSegmentation()
+            # Iterate through each segment in the segmentation node
+            for j in range(segmentation.GetNumberOfSegments()):
+                segmentID = segmentation.GetNthSegmentID(j)
+                segment = segmentation.GetSegment(segmentID)
+                segmentName = segment.GetName()
+                # Initialize segment presence if not already done
+                if segmentName not in segmentPresence:
+                    segmentPresence[segmentName] = []
+                # Record the frame index where the segment is present
+                segmentPresence[segmentName].append(i)
+        # Determine segments present in every frame and those present in only some frames
+        segmentsInEveryFrame = []
+        segmentsInSomeFramesDict = {}
+        for segmentName, frames in segmentPresence.items():
+            if len(frames) == totalFrames:
+                segmentsInEveryFrame.append(segmentName)
+            else:
+                segmentsInSomeFramesDict[segmentName] = frames
+        return segmentsInEveryFrame, segmentsInSomeFramesDict
+
+    def processSegmentSelectorTextToNameAndFrames(self, optionString):
+        """Process the segment name option string back into a segment
+        name and a list of frames. If present in all frames, return
+        None for frame list.  If divider is chosen or an empty string
+        is input, return None,None
+        """
+        if optionString == SEGMENT_NAME_DIVIDER:
+            return None, None
+        # Pattern is ^SegmentName (\[(frameList)\])?
+        frameListPatt = re.compile(
+            r"""\ \(in\ \[ # match " (in ["
+                ([0-9, ]*) # match the comma-separated frame num list
+                ]\)$ # match "])"
+            """,
+            re.VERBOSE,
+        )
+        frMatch = frameListPatt.search(optionString)
+        if frMatch:
+            # There is a list of frames
+            frames = [int(frStr) for frStr in frMatch.group(1).split(",")]
+            namePattForPartial = re.compile("(.*)(?! \(in \[)")
+            # pattern matches everything before " (in ["
+            nameMatch = namePattForPartial.match(optionString)
+            segmentName = nameMatch.group(1)
+        else:
+            # This segment is in all frames
+            segmentName = optionString
+            frames = None
+        return segmentName, frames
+
+    def buildOptionStrings(self, segmentsList, partialSegmentDict):
+        """Build the list of option strings for the segment chooser
+        combobox.  The segments which are in all frames go on top,
+        then a divider, then segments which are only in some frames.
+        """
+        optionStrings = [segmentName for segmentName in segmentsList]
+        optionStrings.append(SEGMENT_NAME_DIVIDER)
+        for segmentName, frames in partialSegmentDict.items():
+            frameList = ", ".join([f"{frame}" for frame in frames])
+            optionStr = f"{segmentName} (in [{frameList}])"
+            optionStrings.append(optionStr)
+        return optionStrings
+
+    def updateComboBoxOptions(self, comboBox, newOptions: List[str]) -> bool:
+        """Update a qComboBox with the list of new options, only if the
+        list of options is different from the current list. Returns True
+        if the list of options changed, and returns False otherwise.
+        """
+        currentOptions = [comboBox.itemText(i) for i in range(comboBox.count)]
+        if currentOptions != newOptions:
+            comboBox.clear()
+            comboBox.addItems(newOptions)
+            listChanged = True
+        else:
+            listChanged = False
+        return listChanged
+
     def process(
         self,
         inputVolume: vtkMRMLScalarVolumeNode,
@@ -354,6 +651,28 @@ class DynamicMalaciaToolsLogic(ScriptedLoadableModuleLogic):
 
         stopTime = time.time()
         logging.info(f"Processing completed in {stopTime-startTime:.2f} seconds")
+
+    def runCrossSectionalAnalysis(
+        self,
+        centerline: vtkMRMLMarkupsCurveNode,
+        lumenNode: vtkMRMLSegmentationNode,
+        lumenSegmentID: str,
+        outputTable: vtkMRMLTableNode,
+    ):
+        """Run the cross-sectional analysis. This is just a wrapper
+        for the function in the CrossSectionAnalysis module.
+        """
+        import CrossSectionAnalysis
+
+        csaLogic = CrossSectionAnalysis.CrossSectionAnalysisLogic()
+        csaLogic.inputCenterlineNode = centerline
+        csaLogic.lumenSurfaceNode = lumenNode
+        csaLogic.currentSegmentID = lumenSegmentID
+        csaLogic.outputTableNode = outputTable
+        csaLogic.outputPlotSeriesNode = None
+        csaLogic.run()
+        # csaLogic.updateOutputTable(centerline, outputTable)
+        return outputTable
 
 
 #
