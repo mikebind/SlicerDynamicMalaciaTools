@@ -16,6 +16,7 @@ from slicer.parameterNodeWrapper import (
 
 import numpy as np
 import re
+import pathlib
 
 from slicer import (
     vtkMRMLScalarVolumeNode,
@@ -138,13 +139,19 @@ class DynamicMalaciaToolsParameterNode:
     segmentName: Optional[str] = None
     segmentFrames: Optional[List[int]] = None
     outputTableSequence: Optional[vtkMRMLSequenceNode] = None
+    mergedCSATableNode: Optional[vtkMRMLTableNode]
 
     centerlineNodeSingle: vtkMRMLMarkupsCurveNode
     singleSegmentationNode: vtkMRMLSegmentationNode
-    singleSegmentationSegmentID: (
-        str  # I think segmentIDs are equivalent to just strings
-    )
+    singleSegmentationSegmentID: str
     singleSegmentOutputTableNode: vtkMRMLTableNode
+
+    volumeLimitingSegmentationNode: vtkMRMLSegmentationNode
+    volumeLimitingSegmentID: str
+
+    volumeOutputTableNode: Optional[vtkMRMLTableNode]
+
+    saveDirectory: pathlib.Path
 
 
 #
@@ -204,6 +211,14 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
         self.ui.SegmentSelectorWidget.connect(
             "currentSegmentChanged(QString)", self.onSingleSegmentSelectionChange
         )
+        self.ui.volumeLimitingSegmentationSelector.connect(
+            "currentNodeChanged(vtkMRMLNode*)",
+            self.onVolumeLimitingSegmentationSelectionChange,
+        )
+        self.ui.volumeLimitingSegmentationSelector.connect(
+            "currentSegmentChanged(QString)",
+            self.onVolumeLimitingSegmentSelectionChange,
+        )
         self.ui.segmentationSequenceSelector.connect(
             "currentNodeChanged(vtkMRMLNode*)",
             self.onSegmentationSequenceSelectorChange,
@@ -228,6 +243,15 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
             "clicked(bool)", self.onRunSingleCSAButtonClick
         )
         self.ui.runCSAAnalysisButton.connect("clicked(bool)", self.onRunCSAButtonClick)
+        self.ui.findLimitedVolumeButton.connect(
+            "clicked(bool)", self.onFindLimitedVolumesButtonClick
+        )
+        self.ui.saveOutputTablesButton.connect(
+            "clicked(bool)", self.onSaveOutputTablesButtonClick
+        )
+        self.ui.makeCSAPlotButton.connect(
+            "clicked(bool)", self.onMakeCSAPlotButtonClick
+        )
 
         # Make sure parameter node is initialized (needed for module reload)
         self.initializeParameterNode()
@@ -322,6 +346,73 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
         if not browserNode.IsSynchronizedSequenceNode(outputTableSequence):
             browserNode.AddSynchronizedSequenceNode(outputTableSequence)
 
+    def onFindLimitedVolumesButtonClick(self):
+        """Run the volume limiting by region across all frames, and
+        report the limited volumes in a table.
+        """
+        pn = self._parameterNode
+        limitingSegmentationNode = pn.volumeLimitingSegmentationNode
+        limitingSegmentID = pn.volumeLimitingSegmentID
+        segSeq = pn.segmentationSequence
+        segmentName = pn.segmentName
+        volumeOutputTableNode = pn.volumeOutputTableNode
+        if volumeOutputTableNode is None:
+            volumeOutputTableNode = slicer.mrmlScene.AddNewNodeByClass(
+                "vtkMRMLTableNode", "LimitedSegmentVolumes"
+            )
+            pn.volumeOutputTableNode = volumeOutputTableNode
+        browserNode = (
+            slicer.modules.sequences.logic().GetFirstBrowserNodeForSequenceNode(segSeq)
+        )
+        nFrames = browserNode.GetNumberOfItems()
+        limitedSegmentVolumes = []
+        for frameIdx in range(nFrames):
+            browserNode.SetSelectedItemNumber(frameIdx)
+            segmentationNode = browserNode.GetProxyNode(segSeq)
+            limitedSegmentVolume = self.logic.getLimitedSegmentVolume(
+                segmentName,
+                segmentationNode,
+                limitingSegmentID,
+                limitingSegmentationNode,
+            )
+            limitedSegmentVolumes.append(limitedSegmentVolume)
+        self.logic.addVolumesToTable(limitedSegmentVolumes, volumeOutputTableNode)
+
+    def onSaveOutputTablesButtonClick(self):
+        """Save available and selected output tables to spreadsheet files."""
+        pn = self._parameterNode
+        volumeOutputTableNode = pn.volumeOutputTableNode
+        saveDir = pn.saveDirectory
+        if volumeOutputTableNode:
+            self.logic.saveVolumeOutputTableNodeToFile(volumeOutputTableNode, saveDir)
+        if pn.outputTableSequence:
+            mergedCsaTableNode = self.logic.consolidateCSATables(pn.outputTableSequence)
+            self.logic.saveMergedCsaTableNodeToFile(mergedCsaTableNode, saveDir)
+
+    def onMakeCSAPlotButtonClick(self):
+        """Make a plot of CSA profiles including envelope (max/min) values and
+        a line which moves with the browser frame
+        """
+        pn = self._parameterNode
+        csaSeqNode = pn.outputTableSequence
+        if csaSeqNode is None:
+            slicer.util.warningDialog(
+                "No CSA Table Sequence Selected; can't make plot!"
+            )
+            return
+        mergedTableNode = pn.mergedCSATableNode
+        if mergedTableNode is None:
+            mergedTableNode = self.logic.consolidateCSATables(csaSeqNode)
+            pn.mergedCSATableNode = mergedTableNode
+        chartNode, (lowSer, highSer, dynSer) = self.logic.makeDynamicPlotChart(
+            mergedTableNode=mergedTableNode, csaSeqNode=csaSeqNode
+        )
+        # Show this in the application
+        showPlotLayoutNum = 36
+        slicer.app.layoutManager().setLayout(showPlotLayoutNum)
+        plotViewNode = slicer.mrmlScene.GetFirstNodeByClass("vtkMRMLPlotViewNode")
+        plotViewNode.SetPlotChartNodeID(chartNode.GetID())
+
     def onSegmentationSequenceSelectorChange(self, newNode):
         """User changed selection of segmentation sequence node.  The
         list of options on the segment selection list must be updated
@@ -344,6 +435,18 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
         optionStrings = self.logic.buildOptionStrings(segmentsList, partialSegmentDict)
         # Update the segment chooser combobox widget
         self.logic.updateComboBoxOptions(self.ui.segmentNameComboBox, optionStrings)
+
+    def onVolumeLimitingSegmentationSelectionChange(self, newSegNode):
+        """Triggered when new segmentation node is selected on the
+        volume limiting segmentation selection widget.
+        """
+        self._parameterNode.volumeLimitingSegmentationNode = newSegNode
+
+    def onVolumeLimitingSegmentSelectionChange(self, newSegmentID):
+        """Triggered when new segment is selected on the volume
+        limiting segment selector widget.
+        """
+        self._parameterNode.volumeLimitingSegmentID = newSegmentID
 
     def onSingleSegmentSelectionChange(self, newSegmentNameOrID):
         """Triggered when a different segment name is chosen on the
@@ -464,6 +567,213 @@ class DynamicMalaciaToolsLogic(ScriptedLoadableModuleLogic):
 
     def getParameterNode(self):
         return DynamicMalaciaToolsParameterNode(super().getParameterNode())
+
+    def makeDynamicPlotChart(self, mergedTableNode, csaSeqNode):
+        """This function should create a plotChart node and three
+        plotSeries nodes showing the envelope of CSA values (2 of the
+        3 series) and one profile with the current CSA (which should
+        vary with the sequence browser index).
+        """
+        browserNode = (
+            slicer.modules.sequences.logic().GetFirstBrowserNodeForSequenceNode(
+                csaSeqNode
+            )
+        )
+        proxyTableNode = browserNode.GetProxyNode(csaSeqNode)
+        # Determine the envelope of CSA values
+        allCSAs = self.convertTableNodeToNumpy(mergedTableNode)
+        lowestCSA = np.min(allCSAs, axis=1)
+        highestCSA = np.max(allCSAs, axis=1)
+        # Make these back into table a table node so that it can be referenced
+        # by plotSeries nodes
+        vLowestCol = vtk.vtkFloatArray()
+        vLowestCol.SetName("MinCSA")
+        vHighestCol = vtk.vtkFloatArray()
+        vHighestCol.SetName("MaxCSA")
+        for idx in range(lowestCSA.size):
+            vLowestCol.InsertNextValue(lowestCSA[idx])
+            vHighestCol.InsertNextValue(highestCSA[idx])
+        # Create table node to hold envelope
+        envTableNode = slicer.mrmlScene.AddNewNodeByClass(
+            "vtkMRMLTableNode", slicer.mrmlScene.GenerateUniqueName("CSAEnvelopeTable")
+        )
+        envTableNode.AddColumn(vLowestCol)
+        envTableNode.AddColumn(vHighestCol)
+        # Make plot series for each of these
+        lowPlotSeries = slicer.mrmlScene.AddNewNodeByClass(
+            "vtkMRMLPlotSeriesNode", "MinCSA"
+        )
+        lowPlotSeries.SetAndObserveTableNodeID(envTableNode.GetID())
+        lowPlotSeries.SetXColumnName("Index")
+        lowPlotSeries.SetYColumnName("MinCSA")
+        lowPlotSeries.SetPlotType(slicer.vtkMRMLPlotSeriesNode.PlotTypeLine)
+        gray = [0.75, 0.75, 0.75]
+        lowPlotSeries.SetColor(gray)
+        highPlotSeries = slicer.mrmlScene.AddNewNodeByClass(
+            "vtkMRMLPlotSeriesNode", "MaxCSA"
+        )
+        highPlotSeries.SetAndObserveTableNodeID(envTableNode.GetID())
+        highPlotSeries.SetXColumnName("Index")
+        highPlotSeries.SetYColumnName("MaxCSA")
+        highPlotSeries.SetPlotType(slicer.vtkMRMLPlotSeriesNode.PlotTypeLine)
+        highPlotSeries.SetColor(gray)
+        # Make plot series for dynamic one using the proxy node
+        dynPlotSeries = slicer.mrmlScene.AddNewNodeByClass(
+            "vtkMRMLPlotSeriesNode", "FrameCSA"
+        )
+        dynPlotSeries.SetAndObserveTableNodeID(proxyTableNode.GetID())
+        dynPlotSeries.SetXColumnName("Index")
+        dynPlotSeries.SetYColumnName("Cross-section area")
+        dynPlotSeries.SetPlotType(slicer.vtkMRMLPlotSeriesNode.PlotTypeLine)
+        dynPlotSeries.SetColor([0, 0, 1])
+        # Set up plotChart
+        plotChartNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLPlotChartNode")
+        plotChartNode.SetName(slicer.mrmlScene.GenerateUniqueName("CSA_Dynamic"))
+        for plotSeries in [lowPlotSeries, highPlotSeries, dynPlotSeries]:
+            plotChartNode.AddAndObservePlotSeriesNodeID(plotSeries.GetID())
+        plotChartNode.SetXAxisTitle("Point # Along Centerline")
+        plotChartNode.SetYAxisTitle("Cross-sectional Area mm^2")
+        return plotChartNode, (lowPlotSeries, highPlotSeries, dynPlotSeries)
+
+    def convertTableNodeToNumpy(self, tableNode, skipMultiComponentCols=True):
+        """Hacky conversion, beware of errors or weird effects if you
+        input a table with anything other than straight numbers in equal
+        length columns...
+        Added skipMultiComponentCols as an easy way to ignore RAS coord col.
+        """
+        from vtk.util import numpy_support
+
+        temp_npcols = []
+        for idx in range(tableNode.GetTable().GetNumberOfColumns()):
+            vtkArr = tableNode.GetTable().GetColumn(idx)
+            if vtkArr.GetNumberOfComponents() > 1 and skipMultiComponentCols:
+                continue
+            npArr = numpy_support.vtk_to_numpy(vtkArr)
+            temp_npcols.append(npArr)
+        # Stack them all into the final numpy array
+        arr = np.column_stack(temp_npcols)
+        return arr
+
+    def saveVolumeOutputTableNodeToFile(self, tableNode, saveDir):
+        """ """
+        csvFileName = pathlib.Path("LimitedAirwayVolumes.csv")
+        csvFilePath = pathlib.Path.joinpath(saveDir, csvFileName)
+        slicer.util.saveNode(tableNode, str(csvFilePath))
+
+    def consolidateCSATables(self, tableSequence):
+        """Gather the cross-sectional area table column across
+        each frame and merge it into a unified table
+        """
+        mergedTableNode = slicer.mrmlScene.AddNewNodeByClass(
+            "vtkMRMLTableNode", "MergedCSATable"
+        )
+        for frameIdx in range(tableSequence.GetNumberOfDataNodes()):
+            tableNode = tableSequence.GetNthDataNode(frameIdx)
+            column = tableNode.GetTable().GetColumnByName("Cross-section area")
+            newCol = vtk.vtkFloatArray()
+            newCol.SetName(f"CSA (#{frameIdx})")
+            for dataIdx in range(column.GetNumberOfValues()):
+                newCol.InsertNextValue(column.GetValue(dataIdx))
+            # Add it to the table
+            mergedTableNode.AddColumn(newCol)
+        # Also add the RAS coordinate of from the centerline, associated with each row
+        RAScol = tableNode.GetTable().GetColumnByName("RAS")
+        newCol = vtk.vtkFloatArray()
+        newCol.SetName("RAS Coordinate")
+        newCol.SetNumberOfComponents(3)
+        for dataIdx in range(RAScol.GetNumberOfTuples()):
+            newCol.InsertNextTuple(RAScol.GetTuple(dataIdx))
+        mergedTableNode.AddColumn(newCol)
+        return mergedTableNode
+
+    def saveMergedCsaTableNodeToFile(self, tableNode, saveDir):
+        """ """
+        csvFileName = pathlib.Path("MergedAirwayCSAs.csv")
+        csvFilePath = pathlib.Path.joinpath(saveDir, csvFileName)
+        slicer.util.saveNode(tableNode, str(csvFilePath))
+
+    def addVolumesToTable(self, limitedSegmentVolumes, tableNode):
+        """Add the segment volume data to the given table node as a
+        new column
+        """
+        column = vtk.vtkFloatArray()
+        column.SetName("LimitedSegmentVolume_cm3")
+        for vol in limitedSegmentVolumes:
+            column.InsertNextValue(vol)
+        tableNode.AddColumn(column)
+
+    def getLimitedSegmentVolume(
+        self, segmentName, segmentationNode, limitingSegmentID, limitingSegmentationNode
+    ):
+        """Limit a copy of the segment in segmentationNode with name segmentName by
+        intersection with the segment from limitingSegmentationNode (could be same or
+        different) with segmentID limitingSegmentID, and return the limited segment
+        volume in cm3.
+        """
+        limitedSegmentName = f"{segmentName}_limited"
+        dupSegID = self.duplicateSegment(
+            segmentName, segmentationNode, limitedSegmentName
+        )
+        self.limitSegmentRegion(
+            dupSegID, segmentationNode, limitingSegmentID, limitingSegmentationNode
+        )
+        volumeMeasurementNameCm3 = "LabelmapSegmentStatisticsPlugin.volume_cm3"
+        segStatsLogic = self.generateSegmentVolumeStats(segmentationNode)
+        segStats = segStatsLogic.getStatistics()
+        volCm3 = segStats[limitedSegmentName, volumeMeasurementNameCm3]
+
+        return volCm3
+
+    def duplicateSegment(self, segmentNameToDup, segmentationNode, dupName: str):
+        """ """
+        segID = segmentationNode.GetSegmentation().GetSegmentIdBySegmentName(
+            segmentNameToDup
+        )
+        dupSegID = copy_segment(dupName, segmentationNode, segmentIDToCopy=segID)
+        return dupSegID
+
+    def limitSegmentRegion(
+        self,
+        segmentIDToLimit,
+        segmentationNode,
+        segmentIDToIntersectWith,
+        otherSegmentationNode=None,
+    ):
+        """Limit a given segment in a given segmentation to only that area which intersects with the another segment, possibly from
+        another segmentation
+        """
+        if otherSegmentationNode is None:
+            otherSegmentationNode = segmentationNode
+        # Check whether the segment to intersect with is in a different segmentation or the same segmentation
+        if otherSegmentationNode != segmentationNode:
+            # Segment to intersect with needs to be copied in from the other segmentation node
+            segmentationNode.GetSegmentation().CopySegmentFromSegmentation(
+                otherSegmentationNode.GetSegmentation(), segmentIDToIntersectWith
+            )
+        # Do intersection
+        intersect_segment(
+            segmentIDToLimit, segmentIDToIntersectWith, segmentationNode
+        )  # use helper function
+        if otherSegmentationNode != segmentationNode:
+            # Remove copied segment
+            segmentationNode.RemoveSegment(segmentIDToIntersectWith)
+
+    def generateSegmentVolumeStats(self, segmentationNode):
+        """Compute segment volumes"""
+        import SegmentStatistics
+
+        segStatLogic = SegmentStatistics.SegmentStatisticsLogic()
+        spn = segStatLogic.getParameterNode()
+        spn.SetParameter("Segmentation", segmentationNode.GetID())
+        spn.SetParameter("ScalarVolumeSegmentStatisticsPlugin.enabled", "False")
+        spn.SetParameter("LabelmapSegmentStatisticsPlugin.enabled", "True")
+        spn.SetParameter("ClosedSurfaceSegmentStatisticsPlugin.enabled", "False")
+        spn.SetParameter("LabelmapSegmentStatisticsPlugin.voxel_count.enabled", "True")
+        spn.SetParameter("LabelmapSegmentStatisticsPlugin.volume_mm3.enabled", "False")
+        spn.SetParameter("LabelmapSegmentStatisticsPlugin.volume_cm3.enabled", "True")
+        # Actually do the computation
+        segStatLogic.computeStatistics()
+        return segStatLogic
 
     def setCompatibleSeqIndexing(self, newSeqNode, seqNodeToMatch):
         """Sets indexing to be compatible by matching the index
@@ -643,6 +953,79 @@ class DynamicMalaciaToolsLogic(ScriptedLoadableModuleLogic):
         csaLogic.run()
         # csaLogic.updateOutputTable(centerline, outputTable)
         return outputTable
+
+
+#
+# Helper functions
+#
+
+
+def copy_segment(newSegmentName, segmentationNode, segmentIDToCopy):
+    """Copy an existing segment into a new segment without overwriting"""
+    import SegmentEditorEffects
+
+    segmentEditorWidget, segmentEditorNode, segmentationNode = setup_segment_editor(
+        segmentationNode
+    )
+    newSegmentID = segmentationNode.GetSegmentation().AddEmptySegment(newSegmentName)
+    segmentEditorNode.SetSelectedSegmentID(newSegmentID)
+    segmentEditorWidget.setActiveEffectByName("Logical operators")
+    effect = segmentEditorWidget.activeEffect()
+    effect.setParameter("Operation", SegmentEditorEffects.LOGICAL_COPY)
+    effect.setParameter("ModifierSegmentID", segmentIDToCopy)
+    # Masking Settings
+    effect.setParameter(
+        "BypassMasking", 1
+    )  # probably not necessary since I adjust masking settings next
+    segmentEditorNode.SetMaskMode(segmentationNode.EditAllowedEverywhere)
+    segmentEditorNode.MasterVolumeIntensityMaskOff()
+    segmentEditorNode.SetOverwriteMode(segmentEditorNode.OverwriteNone)
+    # Do the copy
+    effect.self().onApply()
+    slicer.mrmlScene.RemoveNode(segmentEditorNode)
+    return newSegmentID
+
+
+def intersect_segment(segmentID, segmentIDToIntersectWith, segmentationNode):
+    """Keep only the portion of an existing segment which intersects another segment"""
+    import SegmentEditorEffects
+
+    segmentEditorWidget, segmentEditorNode, segmentationNode = setup_segment_editor(
+        segmentationNode
+    )
+    segmentEditorNode.SetSelectedSegmentID(segmentID)
+    segmentEditorWidget.setActiveEffectByName("Logical operators")
+    effect = segmentEditorWidget.activeEffect()
+    effect.setParameter("Operation", SegmentEditorEffects.LOGICAL_INTERSECT)
+    effect.setParameter("ModifierSegmentID", segmentIDToIntersectWith)
+    effect.setParameter(
+        "BypassMasking", 1
+    )  # will not modify any other segments or apply any intensity masking to the results
+    effect.self().onApply()
+    slicer.mrmlScene.RemoveNode(segmentEditorNode)
+
+
+def setup_segment_editor(segmentationNode=None, masterVolumeNode=None):
+    """Runs standard setup of segment editor widget and segment editor node"""
+    if segmentationNode is None:
+        # Create segmentation node
+        segmentationNode = slicer.vtkMRMLSegmentationNode()
+        slicer.mrmlScene.AddNode(segmentationNode)
+        segmentationNode.CreateDefaultDisplayNodes()
+    segmentEditorWidget = slicer.qMRMLSegmentEditorWidget()
+    segmentEditorNode = slicer.vtkMRMLSegmentEditorNode()
+    slicer.mrmlScene.AddNode(segmentEditorNode)
+    segmentEditorWidget.setMRMLSegmentEditorNode(segmentEditorNode)
+    segmentEditorWidget.setSegmentationNode(segmentationNode)
+    segmentEditorWidget.setMRMLScene(slicer.mrmlScene)
+    if masterVolumeNode:
+        if slicer.app.majorVersion > 4:
+            # Method name change
+            segmentEditorWidget.setSourceVolumeNode(masterVolumeNode)
+        else:
+            # old method name
+            segmentEditorWidget.setMasterVolumeNode(masterVolumeNode)
+    return segmentEditorWidget, segmentEditorNode, segmentationNode
 
 
 #
