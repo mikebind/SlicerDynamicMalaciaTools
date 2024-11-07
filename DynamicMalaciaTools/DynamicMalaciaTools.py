@@ -135,18 +135,13 @@ class DynamicMalaciaToolsParameterNode:
     """
 
     centerlineNode: vtkMRMLMarkupsCurveNode
-    segmentationSequence: vtkMRMLSequenceNode
+    segmentationSequence: Optional[vtkMRMLSequenceNode] = None
     segmentName: Optional[str] = None
     segmentFrames: Optional[List[int]] = None
     outputTableSequence: Optional[vtkMRMLSequenceNode] = None
     mergedCSATableNode: Optional[vtkMRMLTableNode]
 
-    centerlineNodeSingle: vtkMRMLMarkupsCurveNode
-    singleSegmentationNode: vtkMRMLSegmentationNode
-    singleSegmentationSegmentID: str
-    singleSegmentOutputTableNode: vtkMRMLTableNode
-
-    volumeLimitingSegmentationNode: vtkMRMLSegmentationNode
+    volumeLimitingSegmentationNode: Optional[vtkMRMLSegmentationNode] = None
     volumeLimitingSegmentID: str
 
     volumeOutputTableNode: Optional[vtkMRMLTableNode]
@@ -205,12 +200,6 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
         # Connections
         # qMRMLSegmentSelectorWidgets cannot yet be handled via the parameter node
         # wrapper, so must still be handled manually here
-        self.ui.SegmentSelectorWidget.connect(
-            "currentNodeChanged(vtkMRMLNode*)", self.onSingleSegmentationSelectionChange
-        )
-        self.ui.SegmentSelectorWidget.connect(
-            "currentSegmentChanged(QString)", self.onSingleSegmentSelectionChange
-        )
         self.ui.volumeLimitingSegmentationSelector.connect(
             "currentNodeChanged(vtkMRMLNode*)",
             self.onVolumeLimitingSegmentationSelectionChange,
@@ -239,9 +228,6 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
         )
 
         # Buttons
-        self.ui.runSingleCrossSectionalAnalysisButton.connect(
-            "clicked(bool)", self.onRunSingleCSAButtonClick
-        )
         self.ui.runCSAAnalysisButton.connect("clicked(bool)", self.onRunCSAButtonClick)
         self.ui.findLimitedVolumeButton.connect(
             "clicked(bool)", self.onFindLimitedVolumesButtonClick
@@ -277,23 +263,6 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
         """
         txt = self.ui.segmentNameComboBox.currentText
         self.onSegmentNameChanged(txt)
-
-    def onRunSingleCSAButtonClick(self):
-        """Gather inputs and run the single segmentation cross sectional analysis"""
-        lumenNode = self._parameterNode.singleSegmentationNode
-        lumenSegmentID = self._parameterNode.singleSegmentationSegmentID
-        centerlineNode = self._parameterNode.centerlineNode
-        outputTableNode = self._parameterNode.singleSegmentOutputTableNode
-        if outputTableNode is None:
-            outputTableNode = slicer.mrmlScene.AddNewNodeByClass(
-                "vtkMRMLTableNode", "CSA_SingleOutputTable"
-            )
-            self._parameterNode.singleSegmentOutputTableNode = outputTableNode
-        print(f"LumenSeg: {lumenNode.GetName()}")
-        print(f"LumenSegID: {lumenSegmentID}")
-        self.logic.runCrossSectionalAnalysis(
-            centerlineNode, lumenNode, lumenSegmentID, outputTableNode
-        )
 
     def onRunCSAButtonClick(self):
         """Run cross-sectional analysis for all frames."""
@@ -386,8 +355,10 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
         if volumeOutputTableNode:
             self.logic.saveVolumeOutputTableNodeToFile(volumeOutputTableNode, saveDir)
         if pn.outputTableSequence:
-            mergedCsaTableNode = self.logic.consolidateCSATables(pn.outputTableSequence)
-            self.logic.saveMergedCsaTableNodeToFile(mergedCsaTableNode, saveDir)
+            pn.mergedCSATableNode = self.logic.consolidateCSATables(
+                pn.outputTableSequence
+            )
+            self.logic.saveMergedCsaTableNodeToFile(pn.mergedCSATableNode, saveDir)
 
     def onMakeCSAPlotButtonClick(self):
         """Make a plot of CSA profiles including envelope (max/min) values and
@@ -447,18 +418,6 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
         limiting segment selector widget.
         """
         self._parameterNode.volumeLimitingSegmentID = newSegmentID
-
-    def onSingleSegmentSelectionChange(self, newSegmentNameOrID):
-        """Triggered when a different segment name is chosen on the
-        single segmentation segment selector widget.
-        """
-        self._parameterNode.singleSegmentationSegmentID = newSegmentNameOrID
-
-    def onSingleSegmentationSelectionChange(self, newSegNode):
-        """Triggered when new segmentation node is selected on the
-        single segmentation segment selector widget.
-        """
-        self._parameterNode.singleSegmentationNode = newSegNode
 
     def cleanup(self) -> None:
         """Called when the application closes and the module widget is destroyed."""
@@ -529,12 +488,12 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
             self._checkCanApply()
 
     def _checkCanApply(self, caller=None, event=None) -> None:
-        if (
-            self._parameterNode
-            and self._parameterNode.centerlineNode
-            and self._parameterNode.segmentationSequence
-            and self._parameterNode.segmentName
-        ):
+        """Enable or disable buttons based on whether their required inputs
+        are present
+        """
+        pn = self._parameterNode
+        # Run CSA Analysis Button
+        if pn and pn.centerlineNode and pn.segmentationSequence and pn.segmentName:
             self.ui.runCSAAnalysisButton.toolTip = _(
                 "Run cross-section analysis across all frames"
             )
@@ -544,6 +503,40 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
                 "Select centerline, segmentation sequence, and segment name to enable"
             )
             self.ui.runCSAAnalysisButton.enabled = False
+        # Find Limited Volumes Button
+        if pn and pn.volumeLimitingSegmentationNode and pn.volumeLimitingSegmentID:
+            self.ui.findLimitedVolumeButton.enabled = True
+            self.ui.findLimitedVolumeButton.toolTip = _(
+                "Using the selected limiting segment, find the volume of the selected sequence segment which is within the limiting segment, in each frame"
+            )
+        else:
+            self.ui.findLimitedVolumeButton.enabled = False
+            self.ui.findLimitedVolumeButton.toolTip = _(
+                "A limiting segment must be chosen before you can find limited volumes!"
+            )
+        # Save Output Tables To File
+        if pn and pn.saveDirectory != pathlib.Path():
+            # User has set the path somehow, it's OK to enable the button
+            self.ui.saveOutputTablesButton.enabled = True
+            self.ui.saveOutputTablesButton.toolTip = _(
+                "Save tables to CSV files in the specified directory"
+            )
+        else:
+            self.ui.saveOutputTablesButton.enabled = False
+            self.ui.saveOutputTablesButton.toolTip = _(
+                "Specify a save location to enable saving!"
+            )
+        # Make CSA Plot
+        if pn and pn.outputTableSequence:
+            self.ui.makeCSAPlotButton.enabled = True
+            self.ui.makeCSAPlotButton.toolTip = _(
+                "Make a plot of the CSA profile which varies with the sequence frame"
+            )
+        else:
+            self.ui.makeCSAPlotButton.enabled = False
+            self.ui.makeCSAPlotButton.toolTip = _(
+                "Run CSA analysis to enable plotting of results!"
+            )
 
 
 #
@@ -885,52 +878,6 @@ class DynamicMalaciaToolsLogic(ScriptedLoadableModuleLogic):
         else:
             listChanged = False
         return listChanged
-
-    def process(
-        self,
-        inputVolume: vtkMRMLScalarVolumeNode,
-        outputVolume: vtkMRMLScalarVolumeNode,
-        imageThreshold: float,
-        invert: bool = False,
-        showResult: bool = True,
-    ) -> None:
-        """
-        Run the processing algorithm.
-        Can be used without GUI widget.
-        :param inputVolume: volume to be thresholded
-        :param outputVolume: thresholding result
-        :param imageThreshold: values above/below this threshold will be set to 0
-        :param invert: if True then values above the threshold will be set to 0, otherwise values below are set to 0
-        :param showResult: show output volume in slice viewers
-        """
-
-        if not inputVolume or not outputVolume:
-            raise ValueError("Input or output volume is invalid")
-
-        import time
-
-        startTime = time.time()
-        logging.info("Processing started")
-
-        # Compute the thresholded output volume using the "Threshold Scalar Volume" CLI module
-        cliParams = {
-            "InputVolume": inputVolume.GetID(),
-            "OutputVolume": outputVolume.GetID(),
-            "ThresholdValue": imageThreshold,
-            "ThresholdType": "Above" if invert else "Below",
-        }
-        cliNode = slicer.cli.run(
-            slicer.modules.thresholdscalarvolume,
-            None,
-            cliParams,
-            wait_for_completion=True,
-            update_display=showResult,
-        )
-        # We don't need the CLI module node anymore, remove it to not clutter the scene with it
-        slicer.mrmlScene.RemoveNode(cliNode)
-
-        stopTime = time.time()
-        logging.info(f"Processing completed in {stopTime-startTime:.2f} seconds")
 
     def runCrossSectionalAnalysis(
         self,

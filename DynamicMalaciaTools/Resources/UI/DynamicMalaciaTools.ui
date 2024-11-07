@@ -12,95 +12,9 @@
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>
-    <widget class="ctkCollapsibleButton" name="CollapsibleButton">
-     <property name="text">
-      <string>Single Frame Tools</string>
-     </property>
-     <property name="collapsed">
-      <bool>false</bool>
-     </property>
-     <layout class="QFormLayout" name="formLayout">
-      <item row="2" column="0">
-       <widget class="QLabel" name="label_6">
-        <property name="text">
-         <string>Lumen Surface:</string>
-        </property>
-       </widget>
-      </item>
-      <item row="0" column="1">
-       <widget class="qMRMLNodeComboBox" name="centerlineSelectorSingle">
-        <property name="nodeTypes">
-         <stringlist notr="true">
-          <string>vtkMRMLMarkupsCurveNode</string>
-         </stringlist>
-        </property>
-        <property name="hideChildNodeTypes">
-         <stringlist notr="true"/>
-        </property>
-        <property name="interactionNodeSingletonTag">
-         <string notr="true"/>
-        </property>
-        <property name="SlicerParameterName" stdset="0">
-         <string>centerlineNodeSingle</string>
-        </property>
-       </widget>
-      </item>
-      <item row="0" column="0">
-       <widget class="QLabel" name="label_7">
-        <property name="text">
-         <string>Centerline:</string>
-        </property>
-       </widget>
-      </item>
-      <item row="4" column="0" colspan="2">
-       <widget class="QPushButton" name="runSingleCrossSectionalAnalysisButton">
-        <property name="text">
-         <string>Run Single CSA Analysis</string>
-        </property>
-       </widget>
-      </item>
-      <item row="3" column="1">
-       <widget class="qMRMLNodeComboBox" name="tableSelector">
-        <property name="nodeTypes">
-         <stringlist notr="true">
-          <string>vtkMRMLTableNode</string>
-         </stringlist>
-        </property>
-        <property name="hideChildNodeTypes">
-         <stringlist notr="true"/>
-        </property>
-        <property name="interactionNodeSingletonTag">
-         <string notr="true"/>
-        </property>
-        <property name="SlicerParameterName" stdset="0">
-         <string>singleSegmentOutputTableNode</string>
-        </property>
-       </widget>
-      </item>
-      <item row="3" column="0">
-       <widget class="QLabel" name="label_8">
-        <property name="text">
-         <string>Output Table:</string>
-        </property>
-       </widget>
-      </item>
-      <item row="2" column="1">
-       <widget class="qMRMLSegmentSelectorWidget" name="SegmentSelectorWidget">
-        <property name="noneEnabled">
-         <bool>true</bool>
-        </property>
-        <property name="selectNodeUponCreation">
-         <bool>false</bool>
-        </property>
-       </widget>
-      </item>
-     </layout>
-    </widget>
-   </item>
-   <item>
     <widget class="ctkCollapsibleButton" name="CollapsibleButton_2">
      <property name="text">
-      <string>Multiframe Tools</string>
+      <string>Malacia Analysis Tools</string>
      </property>
      <layout class="QFormLayout" name="formLayout_5">
       <item row="1" column="0">
@@ -153,6 +67,9 @@
         </property>
         <property name="selectNodeUponCreation">
          <bool>false</bool>
+        </property>
+        <property name="noneDisplay">
+         <string>Choose segmentation sequence</string>
         </property>
         <property name="SlicerParameterName" stdset="0">
          <string>segmentationSequence</string>
@@ -221,7 +138,14 @@
        </widget>
       </item>
       <item row="6" column="1">
-       <widget class="qMRMLSegmentSelectorWidget" name="volumeLimitingSegmentationSelector"/>
+       <widget class="qMRMLSegmentSelectorWidget" name="volumeLimitingSegmentationSelector">
+        <property name="noneEnabled">
+         <bool>true</bool>
+        </property>
+        <property name="selectNodeUponCreation">
+         <bool>false</bool>
+        </property>
+       </widget>
       </item>
       <item row="8" column="0" colspan="2">
        <widget class="QPushButton" name="findLimitedVolumeButton">
@@ -347,54 +271,6 @@
  </customwidgets>
  <resources/>
  <connections>
-  <connection>
-   <sender>DynamicMalaciaTools</sender>
-   <signal>mrmlSceneChanged(vtkMRMLScene*)</signal>
-   <receiver>centerlineSelectorSingle</receiver>
-   <slot>setMRMLScene(vtkMRMLScene*)</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>162</x>
-     <y>306</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>211</x>
-     <y>60</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
-   <sender>DynamicMalaciaTools</sender>
-   <signal>mrmlSceneChanged(vtkMRMLScene*)</signal>
-   <receiver>tableSelector</receiver>
-   <slot>setMRMLScene(vtkMRMLScene*)</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>162</x>
-     <y>306</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>211</x>
-     <y>167</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
-   <sender>DynamicMalaciaTools</sender>
-   <signal>mrmlSceneChanged(vtkMRMLScene*)</signal>
-   <receiver>SegmentSelectorWidget</receiver>
-   <slot>setMRMLScene(vtkMRMLScene*)</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>162</x>
-     <y>306</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>211</x>
-     <y>69</y>
-    </hint>
-   </hints>
-  </connection>
   <connection>
    <sender>DynamicMalaciaTools</sender>
    <signal>mrmlSceneChanged(vtkMRMLScene*)</signal>
