@@ -17,6 +17,7 @@ from slicer.parameterNodeWrapper import (
 import numpy as np
 import re
 import pathlib
+from vtk.util import numpy_support
 
 from slicer import (
     vtkMRMLScalarVolumeNode,
@@ -575,6 +576,7 @@ class DynamicMalaciaToolsLogic(ScriptedLoadableModuleLogic):
         proxyTableNode = browserNode.GetProxyNode(csaSeqNode)
         # Determine the envelope of CSA values
         allCSAs = self.convertTableNodeToNumpy(mergedTableNode)
+        rasCoords = self.getRASFromTable(mergedTableNode)
         lowestCSA = np.min(allCSAs, axis=1)
         highestCSA = np.max(allCSAs, axis=1)
         # Make these back into table a table node so that it can be referenced
@@ -583,69 +585,91 @@ class DynamicMalaciaToolsLogic(ScriptedLoadableModuleLogic):
         vLowestCol.SetName("MinCSA")
         vHighestCol = vtk.vtkFloatArray()
         vHighestCol.SetName("MaxCSA")
+        vSupCoordCol = vtk.vtkFloatArray()
+        vSupCoordCol.SetName("S_Coordinate")
         for idx in range(lowestCSA.size):
             vLowestCol.InsertNextValue(lowestCSA[idx])
             vHighestCol.InsertNextValue(highestCSA[idx])
+            vSupCoordCol.InsertNextValue(rasCoords[idx, 2])
         # Create table node to hold envelope
         envTableNode = slicer.mrmlScene.AddNewNodeByClass(
             "vtkMRMLTableNode", slicer.mrmlScene.GenerateUniqueName("CSAEnvelopeTable")
         )
         envTableNode.AddColumn(vLowestCol)
         envTableNode.AddColumn(vHighestCol)
+        envTableNode.AddColumn(vSupCoordCol)
         # Make plot series for each of these
         lowPlotSeries = slicer.mrmlScene.AddNewNodeByClass(
             "vtkMRMLPlotSeriesNode", "MinCSA"
         )
         lowPlotSeries.SetAndObserveTableNodeID(envTableNode.GetID())
-        lowPlotSeries.SetXColumnName("Index")
+        lowPlotSeries.SetXColumnName("S_Coordinate")
         lowPlotSeries.SetYColumnName("MinCSA")
-        lowPlotSeries.SetPlotType(slicer.vtkMRMLPlotSeriesNode.PlotTypeLine)
+        lowPlotSeries.SetPlotType(slicer.vtkMRMLPlotSeriesNode.PlotTypeScatter)
         gray = [0.75, 0.75, 0.75]
         lowPlotSeries.SetColor(gray)
         highPlotSeries = slicer.mrmlScene.AddNewNodeByClass(
             "vtkMRMLPlotSeriesNode", "MaxCSA"
         )
         highPlotSeries.SetAndObserveTableNodeID(envTableNode.GetID())
-        highPlotSeries.SetXColumnName("Index")
+        highPlotSeries.SetXColumnName("S_Coordinate")
         highPlotSeries.SetYColumnName("MaxCSA")
-        highPlotSeries.SetPlotType(slicer.vtkMRMLPlotSeriesNode.PlotTypeLine)
+        highPlotSeries.SetPlotType(slicer.vtkMRMLPlotSeriesNode.PlotTypeScatter)
         highPlotSeries.SetColor(gray)
         # Make plot series for dynamic one using the proxy node
         dynPlotSeries = slicer.mrmlScene.AddNewNodeByClass(
             "vtkMRMLPlotSeriesNode", "FrameCSA"
         )
         dynPlotSeries.SetAndObserveTableNodeID(proxyTableNode.GetID())
-        dynPlotSeries.SetXColumnName("Index")
+        dynPlotSeries.SetXColumnName("S_coord")
         dynPlotSeries.SetYColumnName("Cross-section area")
-        dynPlotSeries.SetPlotType(slicer.vtkMRMLPlotSeriesNode.PlotTypeLine)
+        dynPlotSeries.SetPlotType(slicer.vtkMRMLPlotSeriesNode.PlotTypeScatter)
         dynPlotSeries.SetColor([0, 0, 1])
         # Set up plotChart
         plotChartNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLPlotChartNode")
         plotChartNode.SetName(slicer.mrmlScene.GenerateUniqueName("CSA_Dynamic"))
         for plotSeries in [lowPlotSeries, highPlotSeries, dynPlotSeries]:
             plotChartNode.AddAndObservePlotSeriesNodeID(plotSeries.GetID())
-        plotChartNode.SetXAxisTitle("Point # Along Centerline")
+        plotChartNode.SetXAxisTitle("S-Coordinate (Inferior --> Superior, mm)")
         plotChartNode.SetYAxisTitle("Cross-sectional Area mm^2")
         return plotChartNode, (lowPlotSeries, highPlotSeries, dynPlotSeries)
 
-    def convertTableNodeToNumpy(self, tableNode, skipMultiComponentCols=True):
+    def convertTableNodeToNumpy(self, tableNode, skipRASCols=True):
         """Hacky conversion, beware of errors or weird effects if you
         input a table with anything other than straight numbers in equal
         length columns...
         Added skipMultiComponentCols as an easy way to ignore RAS coord col.
         """
-        from vtk.util import numpy_support
 
         temp_npcols = []
         for idx in range(tableNode.GetTable().GetNumberOfColumns()):
             vtkArr = tableNode.GetTable().GetColumn(idx)
-            if vtkArr.GetNumberOfComponents() > 1 and skipMultiComponentCols:
+            if skipRASCols and vtkArr.GetNumberOfComponents() > 1:
+                continue
+            elif skipRASCols and vtkArr.GetName() in ["R_coord", "A_coord", "S_coord"]:
                 continue
             npArr = numpy_support.vtk_to_numpy(vtkArr)
             temp_npcols.append(npArr)
         # Stack them all into the final numpy array
         arr = np.column_stack(temp_npcols)
         return arr
+
+    def getRASFromTable(self, tableNode):
+        """Most of the tables this module generates have a final RAS coordinate
+        column or columns for the centerline locations, this picks that off and returns
+        the coordinates as a Nx3 numpy array
+        """
+        nCols = tableNode.GetTable().GetNumberOfColumns()
+        lastCol = tableNode.GetTable().GetColumn(nCols - 1)
+        if lastCol.GetNumberOfComponents() == 3:
+            rasArr = numpy_support.vtk_to_numpy(lastCol)
+        elif lastCol.GetNumberOfComponents() == 1 and lastCol.GetName() == "S_coord":
+            vTable = tableNode.GetTable()
+            r = numpy_support.vtk_to_numpy(vTable.GetColumnByName("R_coord"))
+            a = numpy_support.vtk_to_numpy(vTable.GetColumnByName("A_coord"))
+            s = numpy_support.vtk_to_numpy(vTable.GetColumnByName("S_coord"))
+            rasArr = np.column_stack((r, a, s))
+        return rasArr
 
     def saveVolumeOutputTableNodeToFile(self, tableNode, saveDir):
         """ """
@@ -655,7 +679,14 @@ class DynamicMalaciaToolsLogic(ScriptedLoadableModuleLogic):
 
     def consolidateCSATables(self, tableSequence):
         """Gather the cross-sectional area table column across
-        each frame and merge it into a unified table
+        each frame and merge it into a unified table.
+        Also, since we now want to use the S coordinate for
+        plotting, and since the X value for plots needs to be
+        in its own column of the table, we will separate the
+        R, A, and S coordinates into their own columns rather
+        than keeping them merged. (NOTE: this also means we
+        need to update the max/min of CSA code to make sure
+        to ignore the coord columns)
         """
         mergedTableNode = slicer.mrmlScene.AddNewNodeByClass(
             "vtkMRMLTableNode", "MergedCSATable"
@@ -669,14 +700,15 @@ class DynamicMalaciaToolsLogic(ScriptedLoadableModuleLogic):
                 newCol.InsertNextValue(column.GetValue(dataIdx))
             # Add it to the table
             mergedTableNode.AddColumn(newCol)
-        # Also add the RAS coordinate of from the centerline, associated with each row
-        RAScol = tableNode.GetTable().GetColumnByName("RAS")
-        newCol = vtk.vtkFloatArray()
-        newCol.SetName("RAS Coordinate")
-        newCol.SetNumberOfComponents(3)
-        for dataIdx in range(RAScol.GetNumberOfTuples()):
-            newCol.InsertNextTuple(RAScol.GetTuple(dataIdx))
-        mergedTableNode.AddColumn(newCol)
+        # Also add the RAS coordinates of from the centerline, associated with each row
+        vTable = tableNode.GetTable()
+        rCol = vTable.GetColumnByName("R_coord")
+        aCol = vTable.GetColumnByName("A_coord")
+        sCol = vTable.GetColumnByName("S_coord")
+        # Add RAS cols to the table
+        mergedTableNode.AddColumn(rCol)
+        mergedTableNode.AddColumn(aCol)
+        mergedTableNode.AddColumn(sCol)
         return mergedTableNode
 
     def saveMergedCsaTableNodeToFile(self, tableNode, saveDir):
@@ -886,8 +918,11 @@ class DynamicMalaciaToolsLogic(ScriptedLoadableModuleLogic):
         lumenSegmentID: str,
         outputTable: vtkMRMLTableNode,
     ):
-        """Run the cross-sectional analysis. This is just a wrapper
-        for the function in the CrossSectionAnalysis module.
+        """Run the cross-sectional analysis. This is mostly just a wrapper
+        for the function in the CrossSectionAnalysis module. However,
+        since we now want the S-coordinate available to use for plotting,
+        we now split the formerly combined RAS column into 3 individual
+        columns named 'R_coord', 'A_coord', and 'S_coord'.
         """
         import CrossSectionAnalysis
 
@@ -899,6 +934,24 @@ class DynamicMalaciaToolsLogic(ScriptedLoadableModuleLogic):
         csaLogic.outputPlotSeriesNode = None
         csaLogic.run()
         # csaLogic.updateOutputTable(centerline, outputTable)
+        vTable = outputTable.GetTable()
+        rasCol = vTable.GetColumnByName("RAS")
+        rCol = vtk.vtkFloatArray()
+        rCol.SetName("R_coord")
+        aCol = vtk.vtkFloatArray()
+        aCol.SetName("A_coord")
+        sCol = vtk.vtkFloatArray()
+        sCol.SetName("S_coord")
+        for idx in range(rasCol.GetNumberOfTuples()):
+            rCol.InsertNextValue(rasCol.GetComponent(idx, 0))
+            aCol.InsertNextValue(rasCol.GetComponent(idx, 1))
+            sCol.InsertNextValue(rasCol.GetComponent(idx, 2))
+        # Remove combined col and add new ones
+        outputTable.GetTable().RemoveColumnByName("RAS")
+        outputTable.AddColumn(rCol)
+        outputTable.AddColumn(aCol)
+        outputTable.AddColumn(sCol)
+
         return outputTable
 
 
