@@ -520,7 +520,7 @@ class DynamicMalaciaToolsLogic(ScriptedLoadableModuleLogic):
         )
         proxyTableNode = browserNode.GetProxyNode(csaSeqNode)
         # Determine the envelope of CSA values
-        allCSAs = self.convertTableNodeToNumpy(mergedTableNode)
+        allCSAs = self.convertTableNodeToNumpy(mergedTableNode, skipRASCols=True)
         rasCoords = self.getRASFromTable(mergedTableNode)
         lowestCSA = np.min(allCSAs, axis=1)
         highestCSA = np.max(allCSAs, axis=1)
@@ -532,10 +532,20 @@ class DynamicMalaciaToolsLogic(ScriptedLoadableModuleLogic):
         vHighestCol.SetName("MaxCSA")
         vSupCoordCol = vtk.vtkFloatArray()
         vSupCoordCol.SetName("S_Coordinate")
+        vInvSCoordCol = vtk.vtkFloatArray()
+        vInvSCoordCol.SetName("InvS_Coordinate")
+        vZInvSCoordCol = vtk.vtkFloatArray()
+        vZInvSCoordCol.SetName("ZInvS_Coordinate")
+        maxS = np.max(rasCoords[:, 2])
         for idx in range(lowestCSA.size):
             vLowestCol.InsertNextValue(lowestCSA[idx])
             vHighestCol.InsertNextValue(highestCSA[idx])
-            vSupCoordCol.InsertNextValue(rasCoords[idx, 2])
+            S = rasCoords[idx, 2]
+            invS = -S
+            zInvS = maxS - S
+            vSupCoordCol.InsertNextValue(S)
+            vInvSCoordCol.InsertNextValue(invS)
+            vZInvSCoordCol.InsertNextValue(zInvS)
         # Create table node to hold envelope
         envTableNode = slicer.mrmlScene.AddNewNodeByClass(
             "vtkMRMLTableNode", slicer.mrmlScene.GenerateUniqueName("CSAEnvelopeTable")
@@ -543,12 +553,14 @@ class DynamicMalaciaToolsLogic(ScriptedLoadableModuleLogic):
         envTableNode.AddColumn(vLowestCol)
         envTableNode.AddColumn(vHighestCol)
         envTableNode.AddColumn(vSupCoordCol)
+        envTableNode.AddColumn(vInvSCoordCol)
+        envTableNode.AddColumn(vZInvSCoordCol)
         # Make plot series for each of these
         lowPlotSeries = slicer.mrmlScene.AddNewNodeByClass(
             "vtkMRMLPlotSeriesNode", "MinCSA"
         )
         lowPlotSeries.SetAndObserveTableNodeID(envTableNode.GetID())
-        lowPlotSeries.SetXColumnName("S_Coordinate")
+        lowPlotSeries.SetXColumnName("InvS_Coordinate")
         lowPlotSeries.SetYColumnName("MinCSA")
         lowPlotSeries.SetPlotType(slicer.vtkMRMLPlotSeriesNode.PlotTypeScatter)
         gray = [0.75, 0.75, 0.75]
@@ -557,7 +569,7 @@ class DynamicMalaciaToolsLogic(ScriptedLoadableModuleLogic):
             "vtkMRMLPlotSeriesNode", "MaxCSA"
         )
         highPlotSeries.SetAndObserveTableNodeID(envTableNode.GetID())
-        highPlotSeries.SetXColumnName("S_Coordinate")
+        highPlotSeries.SetXColumnName("InvS_Coordinate")
         highPlotSeries.SetYColumnName("MaxCSA")
         highPlotSeries.SetPlotType(slicer.vtkMRMLPlotSeriesNode.PlotTypeScatter)
         highPlotSeries.SetColor(gray)
@@ -566,7 +578,7 @@ class DynamicMalaciaToolsLogic(ScriptedLoadableModuleLogic):
             "vtkMRMLPlotSeriesNode", "FrameCSA"
         )
         dynPlotSeries.SetAndObserveTableNodeID(proxyTableNode.GetID())
-        dynPlotSeries.SetXColumnName("S_coord")
+        dynPlotSeries.SetXColumnName("InvS_coord")
         dynPlotSeries.SetYColumnName("Cross-section area")
         dynPlotSeries.SetPlotType(slicer.vtkMRMLPlotSeriesNode.PlotTypeScatter)
         dynPlotSeries.SetColor([0, 0, 1])
@@ -575,7 +587,7 @@ class DynamicMalaciaToolsLogic(ScriptedLoadableModuleLogic):
         plotChartNode.SetName(slicer.mrmlScene.GenerateUniqueName("CSA_Dynamic"))
         for plotSeries in [lowPlotSeries, highPlotSeries, dynPlotSeries]:
             plotChartNode.AddAndObservePlotSeriesNodeID(plotSeries.GetID())
-        plotChartNode.SetXAxisTitle("S-Coordinate (Inferior --> Superior, mm)")
+        plotChartNode.SetXAxisTitle("-S-Coordinate (Superior --> Inferior, mm)")
         plotChartNode.SetYAxisTitle("Cross-sectional Area mm^2")
         return plotChartNode, (lowPlotSeries, highPlotSeries, dynPlotSeries)
 
@@ -591,7 +603,13 @@ class DynamicMalaciaToolsLogic(ScriptedLoadableModuleLogic):
             vtkArr = tableNode.GetTable().GetColumn(idx)
             if skipRASCols and vtkArr.GetNumberOfComponents() > 1:
                 continue
-            elif skipRASCols and vtkArr.GetName() in ["R_coord", "A_coord", "S_coord"]:
+            elif skipRASCols and vtkArr.GetName() in [
+                "R_coord",
+                "A_coord",
+                "S_coord",
+                "InvS_coord",
+                "ZInvS_coord",
+            ]:
                 continue
             npArr = numpy_support.vtk_to_numpy(vtkArr)
             temp_npcols.append(npArr)
@@ -654,6 +672,24 @@ class DynamicMalaciaToolsLogic(ScriptedLoadableModuleLogic):
         mergedTableNode.AddColumn(rCol)
         mergedTableNode.AddColumn(aCol)
         mergedTableNode.AddColumn(sCol)
+        # Add inverse S coord col and zeroed inverse S column to table
+        invSCol = vtk.vtkFloatArray()
+        invSCol.SetName("InvS_coord")
+        zInvSCol = vtk.vtkFloatArray()
+        zInvSCol.SetName("ZInvS_coord")
+        sValues = numpy_support.vtk_to_numpy(sCol)
+        maxS = np.max(sValues)
+        for S in sValues:
+            invSCol.InsertNextValue(-S)
+            zInvSCol.InsertNextValue(maxS - S)
+
+        # Also add these columns to the tables in the sequence
+        # (so that they can be plotted against)
+        for frameIdx in range(tableSequence.GetNumberOfDataNodes()):
+            tableNode = tableSequence.GetNthDataNode(frameIdx)
+            tableNode.AddColumn(invSCol)
+            tableNode.AddColumn(zInvSCol)
+
         return mergedTableNode
 
     def saveMergedCsaTableNodeToFile(self, tableNode, saveDir):
