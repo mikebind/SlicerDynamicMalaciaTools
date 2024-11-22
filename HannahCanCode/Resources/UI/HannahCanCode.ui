@@ -44,7 +44,7 @@
          <bool>false</bool>
         </property>
         <property name="SlicerParameterName" stdset="0">
-         <string>inputVolume</string>
+         <string>inputTableNode</string>
         </property>
        </widget>
       </item>
