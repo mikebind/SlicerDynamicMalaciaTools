@@ -6,26 +6,644 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>325</width>
-    <height>613</height>
+    <width>482</width>
+    <height>1572</height>
    </rect>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>
-    <widget class="ctkCollapsibleButton" name="CollapsibleButton_2">
+    <widget class="ctkCollapsibleButton" name="CollapsibleButton">
      <property name="text">
-      <string>Malacia Analysis Tools</string>
+      <string>Source Data</string>
      </property>
-     <layout class="QFormLayout" name="formLayout_5">
-      <item row="1" column="0">
-       <widget class="QLabel" name="label_9">
+     <layout class="QFormLayout" name="formLayout_8">
+      <item row="0" column="0">
+       <widget class="QLabel" name="label_3">
         <property name="text">
-         <string>Centerline:</string>
+         <string>Original Image Sequence</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="qMRMLNodeComboBox" name="origImageSequenceNodeSelector">
+        <property name="nodeTypes">
+         <stringlist notr="true">
+          <string>vtkMRMLSequenceNode</string>
+         </stringlist>
+        </property>
+        <property name="hideChildNodeTypes">
+         <stringlist notr="true"/>
+        </property>
+        <property name="interactionNodeSingletonTag">
+         <string notr="true"/>
+        </property>
+        <property name="selectNodeUponCreation">
+         <bool>true</bool>
+        </property>
+        <property name="SlicerParameterName" stdset="0">
+         <string>origImageSequenceNode</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="0">
+       <widget class="QLabel" name="label_30">
+        <property name="text">
+         <string>Temporal Step</string>
         </property>
        </widget>
       </item>
       <item row="1" column="1">
-       <widget class="qMRMLNodeComboBox" name="centerlineSelectorNodeMulti">
+       <widget class="QDoubleSpinBox" name="temporalStepSpinBox">
+        <property name="alignment">
+         <set>Qt::AlignCenter</set>
+        </property>
+        <property name="suffix">
+         <string> sec</string>
+        </property>
+        <property name="decimals">
+         <number>3</number>
+        </property>
+        <property name="singleStep">
+         <double>0.010000000000000</double>
+        </property>
+        <property name="value">
+         <double>0.100000000000000</double>
+        </property>
+        <property name="SlicerParameterName" stdset="0">
+         <string>temporalStep</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="ctkCollapsibleButton" name="initSegmentationPhaseCB">
+     <property name="text">
+      <string>Initial Segmentation Phase</string>
+     </property>
+     <layout class="QFormLayout" name="formLayout_2">
+      <item row="3" column="0" colspan="2">
+       <widget class="QPushButton" name="cropImagesAndCreateMinIPButton">
+        <property name="text">
+         <string>Crop Images and Create MinIP</string>
+        </property>
+       </widget>
+      </item>
+      <item row="4" column="0">
+       <widget class="QLabel" name="label_15">
+        <property name="text">
+         <string>Cropped Image Sequence</string>
+        </property>
+       </widget>
+      </item>
+      <item row="4" column="1">
+       <widget class="qMRMLNodeComboBox" name="croppedImageSequenceSelector">
+        <property name="nodeTypes">
+         <stringlist notr="true">
+          <string>vtkMRMLSequenceNode</string>
+         </stringlist>
+        </property>
+        <property name="hideChildNodeTypes">
+         <stringlist notr="true"/>
+        </property>
+        <property name="interactionNodeSingletonTag">
+         <string notr="true"/>
+        </property>
+        <property name="selectNodeUponCreation">
+         <bool>false</bool>
+        </property>
+        <property name="SlicerParameterName" stdset="0">
+         <string>initialCroppedImageSeq</string>
+        </property>
+       </widget>
+      </item>
+      <item row="5" column="0">
+       <widget class="QLabel" name="label_14">
+        <property name="text">
+         <string>Temporal MinIP</string>
+        </property>
+       </widget>
+      </item>
+      <item row="5" column="1">
+       <widget class="qMRMLNodeComboBox" name="minIPSelector">
+        <property name="nodeTypes">
+         <stringlist notr="true">
+          <string>vtkMRMLScalarVolumeNode</string>
+         </stringlist>
+        </property>
+        <property name="hideChildNodeTypes">
+         <stringlist notr="true"/>
+        </property>
+        <property name="interactionNodeSingletonTag">
+         <string notr="true"/>
+        </property>
+        <property name="selectNodeUponCreation">
+         <bool>false</bool>
+        </property>
+        <property name="SlicerParameterName" stdset="0">
+         <string>initialMinIP</string>
+        </property>
+       </widget>
+      </item>
+      <item row="6" column="0">
+       <widget class="QLabel" name="label_31">
+        <property name="text">
+         <string>MinIP Segmentation</string>
+        </property>
+       </widget>
+      </item>
+      <item row="6" column="1">
+       <widget class="qMRMLNodeComboBox" name="minIPSegmentationSelector">
+        <property name="nodeTypes">
+         <stringlist notr="true">
+          <string>vtkMRMLSegmentationNode</string>
+         </stringlist>
+        </property>
+        <property name="hideChildNodeTypes">
+         <stringlist notr="true"/>
+        </property>
+        <property name="interactionNodeSingletonTag">
+         <string notr="true"/>
+        </property>
+        <property name="selectNodeUponCreation">
+         <bool>false</bool>
+        </property>
+        <property name="SlicerParameterName" stdset="0">
+         <string>initialMinIPAirwaySegmentation</string>
+        </property>
+       </widget>
+      </item>
+      <item row="7" column="1">
+       <widget class="QCheckBox" name="minIPSegFinishedCheckBox">
+        <property name="text">
+         <string>MinIP Segmentation Finished</string>
+        </property>
+        <property name="SlicerParameterName" stdset="0">
+         <string>initialMinIPSegmentationFinishedFlag</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="1">
+       <layout class="QHBoxLayout" name="horizontalLayout_4">
+        <item>
+         <widget class="qMRMLNodeComboBox" name="initialCropBoxSelector">
+          <property name="nodeTypes">
+           <stringlist notr="true">
+            <string>vtkMRMLMarkupsROINode</string>
+           </stringlist>
+          </property>
+          <property name="hideChildNodeTypes">
+           <stringlist notr="true"/>
+          </property>
+          <property name="interactionNodeSingletonTag">
+           <string notr="true"/>
+          </property>
+          <property name="selectNodeUponCreation">
+           <bool>false</bool>
+          </property>
+          <property name="SlicerParameterName" stdset="0">
+           <string>initialCropBox</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="createNewInitialCropROIButton">
+          <property name="text">
+           <string>Create New</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+      <item row="8" column="0" colspan="2">
+       <widget class="QPushButton" name="generateInitialSegmentationsButton">
+        <property name="text">
+         <string>Generate Initial Segmentations</string>
+        </property>
+       </widget>
+      </item>
+      <item row="9" column="1">
+       <widget class="qMRMLNodeComboBox" name="airwaySegmentationSequenceSelector">
+        <property name="nodeTypes">
+         <stringlist notr="true">
+          <string>vtkMRMLSegmentationNode</string>
+         </stringlist>
+        </property>
+        <property name="hideChildNodeTypes">
+         <stringlist notr="true"/>
+        </property>
+        <property name="renameEnabled">
+         <bool>true</bool>
+        </property>
+        <property name="interactionNodeSingletonTag">
+         <string notr="true"/>
+        </property>
+        <property name="selectNodeUponCreation">
+         <bool>false</bool>
+        </property>
+        <property name="SlicerParameterName" stdset="0">
+         <string>initialAirSegSeq</string>
+        </property>
+       </widget>
+      </item>
+      <item row="9" column="0">
+       <widget class="QLabel" name="label_18">
+        <property name="text">
+         <string>Initial Airways Sequence</string>
+        </property>
+       </widget>
+      </item>
+      <item row="10" column="0" colspan="2">
+       <widget class="QPushButton" name="findCarinaLocationsButton">
+        <property name="text">
+         <string>Find Carina Locations</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="0">
+       <widget class="QLabel" name="label_4">
+        <property name="text">
+         <string>Initial Crop ROI</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="ctkCollapsibleButton" name="RegistrationPhaseCB">
+     <property name="text">
+      <string>Registered Segmentation Phase</string>
+     </property>
+     <layout class="QFormLayout" name="formLayout">
+      <item row="0" column="0">
+       <widget class="QLabel" name="label_16">
+        <property name="text">
+         <string>Carina Locations</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="qMRMLNodeComboBox" name="carinaLocationsSeqSelector">
+        <property name="nodeTypes">
+         <stringlist notr="true">
+          <string>vtkMRMLSequenceNode</string>
+         </stringlist>
+        </property>
+        <property name="hideChildNodeTypes">
+         <stringlist notr="true"/>
+        </property>
+        <property name="interactionNodeSingletonTag">
+         <string notr="true"/>
+        </property>
+        <property name="selectNodeUponCreation">
+         <bool>false</bool>
+        </property>
+        <property name="SlicerParameterNode" stdset="0">
+         <string>carinaLocationsSeqNode</string>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="0" colspan="2">
+       <widget class="QPushButton" name="alignCarinasButton">
+        <property name="text">
+         <string>Align Carinas</string>
+        </property>
+       </widget>
+      </item>
+      <item row="3" column="0">
+       <widget class="QLabel" name="label_7">
+        <property name="text">
+         <string>Carina Linear Transforms</string>
+        </property>
+       </widget>
+      </item>
+      <item row="3" column="1">
+       <widget class="qMRMLNodeComboBox" name="carinaAlignmentTransformSeqSelector">
+        <property name="nodeTypes">
+         <stringlist notr="true">
+          <string>vtkMRMLSequenceNode</string>
+         </stringlist>
+        </property>
+        <property name="hideChildNodeTypes">
+         <stringlist notr="true"/>
+        </property>
+        <property name="noneEnabled">
+         <bool>false</bool>
+        </property>
+        <property name="interactionNodeSingletonTag">
+         <string notr="true"/>
+        </property>
+        <property name="selectNodeUponCreation">
+         <bool>false</bool>
+        </property>
+        <property name="SlicerParameterName" stdset="0">
+         <string>carinaAlignmentTransformSeq</string>
+        </property>
+       </widget>
+      </item>
+      <item row="5" column="0" colspan="2">
+       <widget class="QPushButton" name="createAlignedMinIPButton">
+        <property name="text">
+         <string>Recrop Images and Create Aligned MinIP</string>
+        </property>
+       </widget>
+      </item>
+      <item row="6" column="0">
+       <widget class="QLabel" name="label_28">
+        <property name="text">
+         <string>Aligned MinIP Image</string>
+        </property>
+       </widget>
+      </item>
+      <item row="6" column="1">
+       <widget class="qMRMLNodeComboBox" name="alignedMinIPImageSelector">
+        <property name="nodeTypes">
+         <stringlist notr="true">
+          <string>vtkMRMLScalarVolumeNode</string>
+         </stringlist>
+        </property>
+        <property name="hideChildNodeTypes">
+         <stringlist notr="true"/>
+        </property>
+        <property name="renameEnabled">
+         <bool>true</bool>
+        </property>
+        <property name="interactionNodeSingletonTag">
+         <string notr="true"/>
+        </property>
+        <property name="selectNodeUponCreation">
+         <bool>false</bool>
+        </property>
+        <property name="SlicerParameterName" stdset="0">
+         <string>alignedMinIP</string>
+        </property>
+       </widget>
+      </item>
+      <item row="8" column="0">
+       <widget class="QLabel" name="label_33">
+        <property name="text">
+         <string>Aligned MinIP Segmentation</string>
+        </property>
+       </widget>
+      </item>
+      <item row="8" column="1">
+       <widget class="qMRMLNodeComboBox" name="alignedMinIPSegmentationSelector">
+        <property name="nodeTypes">
+         <stringlist notr="true">
+          <string>vtkMRMLSegmentationNode</string>
+         </stringlist>
+        </property>
+        <property name="hideChildNodeTypes">
+         <stringlist notr="true"/>
+        </property>
+        <property name="interactionNodeSingletonTag">
+         <string notr="true"/>
+        </property>
+        <property name="selectNodeUponCreation">
+         <bool>false</bool>
+        </property>
+        <property name="SlicerParameterName" stdset="0">
+         <string>alignedMinIPSegmentation</string>
+        </property>
+       </widget>
+      </item>
+      <item row="7" column="0" colspan="2">
+       <widget class="QPushButton" name="transferSegmentationButton">
+        <property name="text">
+         <string>Transfer Segmentation</string>
+        </property>
+       </widget>
+      </item>
+      <item row="9" column="0" colspan="2">
+       <widget class="QPushButton" name="transferToAllFramesButton">
+        <property name="text">
+         <string>Transfer to All Frames</string>
+        </property>
+       </widget>
+      </item>
+      <item row="4" column="0">
+       <widget class="QLabel" name="label_6">
+        <property name="text">
+         <string>Aligned Cropping ROI</string>
+        </property>
+       </widget>
+      </item>
+      <item row="4" column="1">
+       <layout class="QHBoxLayout" name="horizontalLayout_5">
+        <item>
+         <widget class="qMRMLNodeComboBox" name="alignedCropBoxSelector">
+          <property name="nodeTypes">
+           <stringlist notr="true">
+            <string>vtkMRMLMarkupsROINode</string>
+           </stringlist>
+          </property>
+          <property name="hideChildNodeTypes">
+           <stringlist notr="true"/>
+          </property>
+          <property name="interactionNodeSingletonTag">
+           <string notr="true"/>
+          </property>
+          <property name="selectNodeUponCreation">
+           <bool>false</bool>
+          </property>
+          <property name="SlicerParameterName" stdset="0">
+           <string>alignedCropBox</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="createNewAlignedROIButton">
+          <property name="text">
+           <string>Create New</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="ctkCollapsibleButton" name="CenterlinePhaseCB">
+     <property name="text">
+      <string>Centerline Phase</string>
+     </property>
+     <layout class="QFormLayout" name="formLayout_4">
+      <item row="0" column="0">
+       <widget class="QLabel" name="label_19">
+        <property name="text">
+         <string>Input Surface</string>
+        </property>
+       </widget>
+      </item>
+      <item row="4" column="0" colspan="2">
+       <widget class="QPushButton" name="findAndSmoothCenterlineButton">
+        <property name="text">
+         <string>Find and Smooth Centerline</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="qMRMLNodeComboBox" name="centerlineInputSurfaceSelector">
+        <property name="nodeTypes">
+         <stringlist notr="true">
+          <string>vtkMRMLModelNode</string>
+          <string>vtkMRMLSegmentationNode</string>
+         </stringlist>
+        </property>
+        <property name="hideChildNodeTypes">
+         <stringlist notr="true"/>
+        </property>
+        <property name="noneEnabled">
+         <bool>true</bool>
+        </property>
+        <property name="interactionNodeSingletonTag">
+         <string notr="true"/>
+        </property>
+        <property name="selectNodeUponCreation">
+         <bool>false</bool>
+        </property>
+        <property name="noneDisplay">
+         <string>Select model or segment</string>
+        </property>
+        <property name="SlicerParameterName" stdset="0">
+         <string>cline_InputSurfaceNode</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="1">
+       <widget class="qMRMLSegmentSelectorWidget" name="centerlineSegmentSelectorWidget">
+        <property name="segmentationNodeSelectorVisible">
+         <bool>false</bool>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="0">
+       <widget class="QLabel" name="label_20">
+        <property name="text">
+         <string>Endpoints</string>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="1">
+       <layout class="QHBoxLayout" name="horizontalLayout_2">
+        <item>
+         <widget class="qMRMLNodeComboBox" name="endPointsMarkupsSelector">
+          <property name="nodeTypes">
+           <stringlist notr="true">
+            <string>vtkMRMLMarkupsFiducialNode</string>
+           </stringlist>
+          </property>
+          <property name="hideChildNodeTypes">
+           <stringlist notr="true"/>
+          </property>
+          <property name="baseName">
+           <string>Endpoints</string>
+          </property>
+          <property name="interactionNodeSingletonTag">
+           <string notr="true"/>
+          </property>
+          <property name="selectNodeUponCreation">
+           <bool>false</bool>
+          </property>
+          <property name="SlicerParameterName" stdset="0">
+           <string>cline_Endpoints</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="qSlicerMarkupsPlaceWidget" name="endPointsMarkupsPlaceWidget"/>
+        </item>
+       </layout>
+      </item>
+      <item row="3" column="0">
+       <widget class="QLabel" name="label_5">
+        <property name="text">
+         <string>Centerline Step</string>
+        </property>
+       </widget>
+      </item>
+      <item row="3" column="1">
+       <widget class="QDoubleSpinBox" name="doubleSpinBox">
+        <property name="alignment">
+         <set>Qt::AlignCenter</set>
+        </property>
+        <property name="suffix">
+         <string> mm</string>
+        </property>
+        <property name="singleStep">
+         <double>0.100000000000000</double>
+        </property>
+        <property name="value">
+         <double>1.000000000000000</double>
+        </property>
+        <property name="SlicerParameterName" stdset="0">
+         <string>centerlineStepSizeMm</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="ctkCollapsibleButton" name="QuantificationPhaseCB">
+     <property name="text">
+      <string>Quantification Phase</string>
+     </property>
+     <layout class="QFormLayout" name="formLayout_6">
+      <item row="0" column="0">
+       <widget class="QLabel" name="label_21">
+        <property name="text">
+         <string>Airway Segmentations</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="0">
+       <widget class="QLabel" name="label_22">
+        <property name="text">
+         <string>Centerline</string>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="0">
+       <widget class="QLabel" name="label_23">
+        <property name="text">
+         <string>Volume Quantification ROI</string>
+        </property>
+       </widget>
+      </item>
+      <item row="4" column="0" colspan="2">
+       <widget class="QPushButton" name="runQuantificationButton">
+        <property name="text">
+         <string>Run Quantification</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="qMRMLNodeComboBox" name="q_airwaySegmentationsSelector">
+        <property name="nodeTypes">
+         <stringlist notr="true">
+          <string>vtkMRMLSequenceNode</string>
+         </stringlist>
+        </property>
+        <property name="hideChildNodeTypes">
+         <stringlist notr="true"/>
+        </property>
+        <property name="interactionNodeSingletonTag">
+         <string notr="true"/>
+        </property>
+        <property name="selectNodeUponCreation">
+         <bool>false</bool>
+        </property>
+        <property name="SlicerParameterName" stdset="0">
+         <string>q_airwaySegmentationSequence</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="1">
+       <widget class="qMRMLNodeComboBox" name="q_centerlineSelector">
         <property name="nodeTypes">
          <stringlist notr="true">
           <string>vtkMRMLMarkupsCurveNode</string>
@@ -37,161 +655,245 @@
         <property name="interactionNodeSingletonTag">
          <string notr="true"/>
         </property>
-        <property name="SlicerParameterName" stdset="0">
-         <string>centerlineNode</string>
+        <property name="selectNodeUponCreation">
+         <bool>false</bool>
         </property>
-       </widget>
-      </item>
-      <item row="2" column="0">
-       <widget class="QLabel" name="label_10">
-        <property name="text">
-         <string>Segmentation Sequence:</string>
+        <property name="SlicerParameterName" stdset="0">
+         <string>q_smoothedCenterline</string>
         </property>
        </widget>
       </item>
       <item row="2" column="1">
-       <widget class="qMRMLNodeComboBox" name="segmentationSequenceSelector">
-        <property name="nodeTypes">
-         <stringlist notr="true">
-          <string>vtkMRMLSequenceNode</string>
-         </stringlist>
+       <layout class="QHBoxLayout" name="horizontalLayout">
+        <item>
+         <widget class="qMRMLNodeComboBox" name="volumeQuantificationBoxSelector">
+          <property name="nodeTypes">
+           <stringlist notr="true"/>
+          </property>
+          <property name="hideChildNodeTypes">
+           <stringlist notr="true"/>
+          </property>
+          <property name="interactionNodeSingletonTag">
+           <string notr="true"/>
+          </property>
+          <property name="selectNodeUponCreation">
+           <bool>false</bool>
+          </property>
+          <property name="SlicerParameterName" stdset="0">
+           <string>volumeQuantificationBox</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="createNewVolumeQuantROIButton">
+          <property name="text">
+           <string>Create New</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="ctkCollapsibleButton" name="ReviewPhaseCB">
+     <property name="text">
+      <string>Review Phase</string>
+     </property>
+     <layout class="QFormLayout" name="formLayout_7">
+      <item row="0" column="0">
+       <widget class="QLabel" name="label_24">
+        <property name="text">
+         <string>Centerline Slice</string>
         </property>
-        <property name="hideChildNodeTypes">
-         <stringlist notr="true"/>
-        </property>
-        <property name="noneEnabled">
-         <bool>true</bool>
-        </property>
-        <property name="interactionNodeSingletonTag">
-         <string notr="true"/>
-        </property>
-        <property name="selectNodeUponCreation">
-         <bool>false</bool>
-        </property>
-        <property name="noneDisplay">
-         <string>Choose segmentation sequence</string>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="ctkSliderWidget" name="sliceSlider">
+        <property name="decimals">
+         <number>0</number>
         </property>
         <property name="SlicerParameterName" stdset="0">
-         <string>segmentationSequence</string>
+         <string>sliceSliderIdx</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="0">
+       <widget class="QLabel" name="label_25">
+        <property name="text">
+         <string>RAS</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="1">
+       <widget class="QLabel" name="rasText">
+        <property name="enabled">
+         <bool>false</bool>
+        </property>
+        <property name="text">
+         <string>(run quantification first)</string>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="0">
+       <widget class="QLabel" name="label_26">
+        <property name="text">
+         <string>Normal</string>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="1">
+       <widget class="QLabel" name="normalText">
+        <property name="enabled">
+         <bool>false</bool>
+        </property>
+        <property name="text">
+         <string>(run quantification first)</string>
         </property>
        </widget>
       </item>
       <item row="3" column="0">
-       <widget class="QLabel" name="label_11">
+       <widget class="QLabel" name="label_29">
         <property name="text">
-         <string>Segment Name</string>
+         <string>Time Index</string>
         </property>
        </widget>
       </item>
       <item row="3" column="1">
-       <widget class="QComboBox" name="segmentNameComboBox"/>
-      </item>
-      <item row="4" column="0">
-       <widget class="QLabel" name="label_12">
-        <property name="text">
-         <string>Output Table Sequence:</string>
-        </property>
-       </widget>
-      </item>
-      <item row="4" column="1">
-       <widget class="qMRMLNodeComboBox" name="outputTableSequenceNodeSelector">
-        <property name="nodeTypes">
-         <stringlist notr="true">
-          <string>vtkMRMLSequenceNode</string>
-         </stringlist>
-        </property>
-        <property name="hideChildNodeTypes">
-         <stringlist notr="true"/>
-        </property>
-        <property name="noneEnabled">
-         <bool>true</bool>
-        </property>
-        <property name="renameEnabled">
-         <bool>true</bool>
-        </property>
-        <property name="interactionNodeSingletonTag">
-         <string notr="true"/>
-        </property>
-        <property name="selectNodeUponCreation">
+       <widget class="ctkSliderWidget" name="timeStepSlider">
+        <property name="enabled">
          <bool>false</bool>
         </property>
-        <property name="noneDisplay">
-         <string>Create new Table Sequence</string>
+        <property name="decimals">
+         <number>0</number>
         </property>
         <property name="SlicerParameterName" stdset="0">
-         <string>outputTableSequence</string>
+         <string>sequenceSliderIdx</string>
         </property>
        </widget>
       </item>
-      <item row="5" column="0" colspan="2">
-       <widget class="QPushButton" name="runCSAAnalysisButton">
+      <item row="4" column="0">
+       <widget class="QLabel" name="label_32">
         <property name="text">
-         <string>Run CSA Analysis</string>
+         <string>Display controls:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="5" column="0">
+       <widget class="QCheckBox" name="showEnvCurvesFlag">
+        <property name="text">
+         <string>Show envelope curves</string>
+        </property>
+        <property name="SlicerParameterName" stdset="0">
+         <string>showEnvCurvesFlag</string>
+        </property>
+       </widget>
+      </item>
+      <item row="5" column="1">
+       <widget class="QCheckBox" name="showCurrentSlice3DCheckBox">
+        <property name="text">
+         <string>Show current slice on 3D</string>
+        </property>
+        <property name="SlicerParameterName" stdset="0">
+         <string>showCurrentSlice3DFlag</string>
         </property>
        </widget>
       </item>
       <item row="6" column="0">
-       <widget class="QLabel" name="label">
+       <widget class="QCheckBox" name="showCurrentTimeCheckBox">
         <property name="text">
-         <string>Limiting Region:</string>
+         <string>Show current time</string>
+        </property>
+        <property name="SlicerParameterName" stdset="0">
+         <string>showCurrentTimeFlag</string>
         </property>
        </widget>
       </item>
       <item row="6" column="1">
-       <widget class="qMRMLSegmentSelectorWidget" name="volumeLimitingSegmentationSelector">
-        <property name="noneEnabled">
-         <bool>true</bool>
-        </property>
-        <property name="selectNodeUponCreation">
-         <bool>false</bool>
-        </property>
-       </widget>
-      </item>
-      <item row="8" column="0" colspan="2">
-       <widget class="QPushButton" name="findLimitedVolumeButton">
+       <widget class="QCheckBox" name="showARLinesCheckBox">
         <property name="text">
-         <string>Find Limited Volumes</string>
-        </property>
-       </widget>
-      </item>
-      <item row="7" column="0">
-       <widget class="QLabel" name="label_13">
-        <property name="text">
-         <string>Output Table:</string>
-        </property>
-       </widget>
-      </item>
-      <item row="7" column="1">
-       <widget class="qMRMLNodeComboBox" name="volumeOutputTableSelector">
-        <property name="nodeTypes">
-         <stringlist notr="true">
-          <string>vtkMRMLTableNode</string>
-         </stringlist>
-        </property>
-        <property name="hideChildNodeTypes">
-         <stringlist notr="true"/>
-        </property>
-        <property name="noneEnabled">
-         <bool>true</bool>
-        </property>
-        <property name="interactionNodeSingletonTag">
-         <string notr="true"/>
-        </property>
-        <property name="selectNodeUponCreation">
-         <bool>false</bool>
-        </property>
-        <property name="noneDisplay">
-         <string>Create new table</string>
+         <string>Show AR lines</string>
         </property>
         <property name="SlicerParameterName" stdset="0">
-         <string>volumeOutputTableNode</string>
+         <string>showARLinesFlag</string>
         </property>
        </widget>
       </item>
-      <item row="10" column="0" colspan="2">
-       <widget class="ctkPathLineEdit" name="PathLineEdit">
+      <item row="7" column="0" colspan="2">
+       <layout class="QHBoxLayout" name="horizontalLayout_3">
+        <property name="topMargin">
+         <number>10</number>
+        </property>
+        <property name="rightMargin">
+         <number>10</number>
+        </property>
+        <item>
+         <spacer name="horizontalSpacer_2">
+          <property name="orientation">
+           <enum>Qt::Horizontal</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>40</width>
+            <height>20</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
+        <item>
+         <widget class="QPushButton" name="switchToRegularLayoutButton">
+          <property name="text">
+           <string>Switch to Regular Layout</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <spacer name="horizontalSpacer">
+          <property name="orientation">
+           <enum>Qt::Horizontal</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>40</width>
+            <height>20</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
+        <item>
+         <widget class="QPushButton" name="switchToReviewLayoutButton">
+          <property name="text">
+           <string>Switch to Review Layout</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <spacer name="horizontalSpacer_3">
+          <property name="orientation">
+           <enum>Qt::Horizontal</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>40</width>
+            <height>20</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
+       </layout>
+      </item>
+      <item row="8" column="0">
+       <widget class="QLabel" name="label_27">
+        <property name="text">
+         <string>Save Directory</string>
+        </property>
+       </widget>
+      </item>
+      <item row="8" column="1">
+       <widget class="ctkPathLineEdit" name="saveDirPathEdit">
         <property name="filters">
-         <set>ctkPathLineEdit::Dirs|ctkPathLineEdit::Drives|ctkPathLineEdit::Executable|ctkPathLineEdit::NoDot|ctkPathLineEdit::NoDotDot|ctkPathLineEdit::Readable</set>
+         <set>ctkPathLineEdit::Dirs|ctkPathLineEdit::NoDot|ctkPathLineEdit::NoDotDot</set>
         </property>
         <property name="options">
          <set>ctkPathLineEdit::ShowDirsOnly</set>
@@ -201,24 +903,10 @@
         </property>
        </widget>
       </item>
-      <item row="11" column="0" colspan="2">
-       <widget class="QPushButton" name="saveOutputTablesButton">
+      <item row="9" column="0" colspan="2">
+       <widget class="QPushButton" name="saveResultsButton">
         <property name="text">
-         <string>Save Output Tables to File</string>
-        </property>
-       </widget>
-      </item>
-      <item row="9" column="0">
-       <widget class="QLabel" name="label_2">
-        <property name="text">
-         <string>Save Output Location:</string>
-        </property>
-       </widget>
-      </item>
-      <item row="12" column="0" colspan="2">
-       <widget class="QPushButton" name="makeCSAPlotButton">
-        <property name="text">
-         <string>Make CSA Plot</string>
+         <string>Save Results</string>
         </property>
        </widget>
       </item>
@@ -253,6 +941,11 @@
    <header>ctkPathLineEdit.h</header>
   </customwidget>
   <customwidget>
+   <class>ctkSliderWidget</class>
+   <extends>QWidget</extends>
+   <header>ctkSliderWidget.h</header>
+  </customwidget>
+  <customwidget>
    <class>qMRMLNodeComboBox</class>
    <extends>QWidget</extends>
    <header>qMRMLNodeComboBox.h</header>
@@ -264,6 +957,17 @@
    <container>1</container>
   </customwidget>
   <customwidget>
+   <class>qSlicerWidget</class>
+   <extends>QWidget</extends>
+   <header>qSlicerWidget.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>qSlicerMarkupsPlaceWidget</class>
+   <extends>qSlicerWidget</extends>
+   <header>qSlicerMarkupsPlaceWidget.h</header>
+  </customwidget>
+  <customwidget>
    <class>qMRMLSegmentSelectorWidget</class>
    <extends>qMRMLWidget</extends>
    <header>qMRMLSegmentSelectorWidget.h</header>
@@ -272,82 +976,322 @@
  <resources/>
  <connections>
   <connection>
-   <sender>DynamicMalaciaTools</sender>
-   <signal>mrmlSceneChanged(vtkMRMLScene*)</signal>
-   <receiver>centerlineSelectorNodeMulti</receiver>
-   <slot>setMRMLScene(vtkMRMLScene*)</slot>
+   <sender>centerlineInputSurfaceSelector</sender>
+   <signal>currentNodeChanged(vtkMRMLNode*)</signal>
+   <receiver>centerlineSegmentSelectorWidget</receiver>
+   <slot>setCurrentNode(vtkMRMLNode*)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>162</x>
-     <y>306</y>
+     <x>282</x>
+     <y>770</y>
     </hint>
     <hint type="destinationlabel">
-     <x>237</x>
-     <y>257</y>
+     <x>282</x>
+     <y>796</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>endPointsMarkupsSelector</sender>
+   <signal>currentNodeChanged(vtkMRMLNode*)</signal>
+   <receiver>endPointsMarkupsPlaceWidget</receiver>
+   <slot>setCurrentNode(vtkMRMLNode*)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>199</x>
+     <y>825</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>379</x>
+     <y>825</y>
     </hint>
    </hints>
   </connection>
   <connection>
    <sender>DynamicMalaciaTools</sender>
    <signal>mrmlSceneChanged(vtkMRMLScene*)</signal>
-   <receiver>segmentationSequenceSelector</receiver>
+   <receiver>origImageSequenceNodeSelector</receiver>
    <slot>setMRMLScene(vtkMRMLScene*)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>162</x>
-     <y>306</y>
+     <x>240</x>
+     <y>712</y>
     </hint>
     <hint type="destinationlabel">
-     <x>237</x>
-     <y>286</y>
+     <x>317</x>
+     <y>60</y>
     </hint>
    </hints>
   </connection>
   <connection>
    <sender>DynamicMalaciaTools</sender>
    <signal>mrmlSceneChanged(vtkMRMLScene*)</signal>
-   <receiver>outputTableSequenceNodeSelector</receiver>
+   <receiver>initialCropBoxSelector</receiver>
    <slot>setMRMLScene(vtkMRMLScene*)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>162</x>
-     <y>306</y>
+     <x>240</x>
+     <y>712</y>
     </hint>
     <hint type="destinationlabel">
-     <x>237</x>
-     <y>344</y>
+     <x>317</x>
+     <y>190</y>
     </hint>
    </hints>
   </connection>
   <connection>
    <sender>DynamicMalaciaTools</sender>
    <signal>mrmlSceneChanged(vtkMRMLScene*)</signal>
-   <receiver>volumeLimitingSegmentationSelector</receiver>
+   <receiver>carinaAlignmentTransformSeqSelector</receiver>
    <slot>setMRMLScene(vtkMRMLScene*)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>162</x>
-     <y>306</y>
+     <x>240</x>
+     <y>712</y>
     </hint>
     <hint type="destinationlabel">
-     <x>237</x>
-     <y>424</y>
+     <x>317</x>
+     <y>283</y>
     </hint>
    </hints>
   </connection>
   <connection>
    <sender>DynamicMalaciaTools</sender>
    <signal>mrmlSceneChanged(vtkMRMLScene*)</signal>
-   <receiver>volumeOutputTableSelector</receiver>
+   <receiver>croppedImageSequenceSelector</receiver>
    <slot>setMRMLScene(vtkMRMLScene*)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>162</x>
-     <y>306</y>
+     <x>240</x>
+     <y>712</y>
     </hint>
     <hint type="destinationlabel">
-     <x>237</x>
-     <y>462</y>
+     <x>318</x>
+     <y>426</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>DynamicMalaciaTools</sender>
+   <signal>mrmlSceneChanged(vtkMRMLScene*)</signal>
+   <receiver>minIPSelector</receiver>
+   <slot>setMRMLScene(vtkMRMLScene*)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>240</x>
+     <y>712</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>318</x>
+     <y>455</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>DynamicMalaciaTools</sender>
+   <signal>mrmlSceneChanged(vtkMRMLScene*)</signal>
+   <receiver>minIPSegmentationSelector</receiver>
+   <slot>setMRMLScene(vtkMRMLScene*)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>240</x>
+     <y>712</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>318</x>
+     <y>484</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>DynamicMalaciaTools</sender>
+   <signal>mrmlSceneChanged(vtkMRMLScene*)</signal>
+   <receiver>airwaySegmentationSequenceSelector</receiver>
+   <slot>setMRMLScene(vtkMRMLScene*)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>240</x>
+     <y>712</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>318</x>
+     <y>691</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>DynamicMalaciaTools</sender>
+   <signal>mrmlSceneChanged(vtkMRMLScene*)</signal>
+   <receiver>centerlineInputSurfaceSelector</receiver>
+   <slot>setMRMLScene(vtkMRMLScene*)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>240</x>
+     <y>712</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>282</x>
+     <y>770</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>DynamicMalaciaTools</sender>
+   <signal>mrmlSceneChanged(vtkMRMLScene*)</signal>
+   <receiver>centerlineSegmentSelectorWidget</receiver>
+   <slot>setMRMLScene(vtkMRMLScene*)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>240</x>
+     <y>712</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>282</x>
+     <y>796</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>DynamicMalaciaTools</sender>
+   <signal>mrmlSceneChanged(vtkMRMLScene*)</signal>
+   <receiver>endPointsMarkupsSelector</receiver>
+   <slot>setMRMLScene(vtkMRMLScene*)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>240</x>
+     <y>712</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>199</x>
+     <y>825</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>DynamicMalaciaTools</sender>
+   <signal>mrmlSceneChanged(vtkMRMLScene*)</signal>
+   <receiver>endPointsMarkupsPlaceWidget</receiver>
+   <slot>setMRMLScene(vtkMRMLScene*)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>240</x>
+     <y>712</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>379</x>
+     <y>825</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>DynamicMalaciaTools</sender>
+   <signal>mrmlSceneChanged(vtkMRMLScene*)</signal>
+   <receiver>q_airwaySegmentationsSelector</receiver>
+   <slot>setMRMLScene(vtkMRMLScene*)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>240</x>
+     <y>712</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>319</x>
+     <y>942</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>DynamicMalaciaTools</sender>
+   <signal>mrmlSceneChanged(vtkMRMLScene*)</signal>
+   <receiver>q_centerlineSelector</receiver>
+   <slot>setMRMLScene(vtkMRMLScene*)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>240</x>
+     <y>712</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>319</x>
+     <y>971</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>DynamicMalaciaTools</sender>
+   <signal>mrmlSceneChanged(vtkMRMLScene*)</signal>
+   <receiver>volumeQuantificationBoxSelector</receiver>
+   <slot>setMRMLScene(vtkMRMLScene*)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>240</x>
+     <y>712</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>319</x>
+     <y>1000</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>DynamicMalaciaTools</sender>
+   <signal>mrmlSceneChanged(vtkMRMLScene*)</signal>
+   <receiver>carinaLocationsSeqSelector</receiver>
+   <slot>setMRMLScene(vtkMRMLScene*)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>240</x>
+     <y>712</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>324</x>
+     <y>455</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>DynamicMalaciaTools</sender>
+   <signal>mrmlSceneChanged(vtkMRMLScene*)</signal>
+   <receiver>alignedMinIPImageSelector</receiver>
+   <slot>setMRMLScene(vtkMRMLScene*)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>240</x>
+     <y>712</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>324</x>
+     <y>581</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>DynamicMalaciaTools</sender>
+   <signal>mrmlSceneChanged(vtkMRMLScene*)</signal>
+   <receiver>alignedMinIPSegmentationSelector</receiver>
+   <slot>setMRMLScene(vtkMRMLScene*)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>240</x>
+     <y>712</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>324</x>
+     <y>610</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>DynamicMalaciaTools</sender>
+   <signal>mrmlSceneChanged(vtkMRMLScene*)</signal>
+   <receiver>alignedCropBoxSelector</receiver>
+   <slot>setMRMLScene(vtkMRMLScene*)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>240</x>
+     <y>712</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>274</x>
+     <y>528</y>
     </hint>
    </hints>
   </connection>
