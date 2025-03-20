@@ -343,27 +343,52 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
     def onOrigImageSequenceSelectionChange(self, node):
         """Update the browser node when the original sequence is set"""
         pn = self._parameterNode
+        pn.origImageSequenceNode = node
         if node:
             pn.browserNode = getFirstBrowser(node)
-            # Register callback to update cross section and arAxes
-            # when browser frame changes
-            self.addObserver(
-                pn.browserNode,
-                pn.browserNode.ProxyNodeModifiedEvent,
-                self.onFrameChange,
-            )
-            logging.info("Adding browser observation.")
-            self.browserObservation = (
-                pn.browserNode,
-                pn.browserNode.ProxyNodeModifiedEvent,
-                self.onFrameChange,
-            )
+            self.addBrowserObservation()
         elif self.browserObservation:
-            self.removeObserver(*(self.browserObservation))
-            logging.info("Removed browser observation.")
+            # node is None, and there is a prior observation we need to remove
+            self.removeBrowserObservation()
             # self.hasObserver(pn.browserNode, pn.browserNode.ProxyNodeModifiedEvent, self.onFrameChange)
         # Currently does not reset/remove the browser node if the selection
         # changes to None.
+
+    def addBrowserObservation(self):
+        """Register onFrameChange callback to update cross section and arAxes
+        when browser frame changes
+        """
+        pn = self._parameterNode
+        if not pn.browserNode:
+            logging.warning("No browser to observe!")
+            return
+        if self.browserObservation:
+            raise RuntimeError(
+                "Browser is already observed, blocking you from adding another layer of observation!!"
+            )
+            # Consider: Could also potentially auto-remove here before adding new one...
+        self.addObserver(
+            pn.browserNode,
+            pn.browserNode.ProxyNodeModifiedEvent,
+            self.onFrameChange,
+        )
+        # Store record of observation so it can be removed as needed
+        logging.info("Adding browser observation.")
+        self.browserObservation = (
+            pn.browserNode,
+            pn.browserNode.ProxyNodeModifiedEvent,
+            self.onFrameChange,
+        )
+
+    def removeBrowserObservation(self):
+        """Unregister observation of browser changes using stored info
+        about the observation.
+        """
+        if not self.browserObservation:
+            logging.warning("No stored browser observation to remove!")
+            return
+        self.removeObserver(*(self.browserObservation))
+        logging.info("Removed browser observation.")
 
     def onCreateNewVolumeQuantROIButtonClick(self):
         """Create a new volume quantification ROI node.  Base it on
@@ -407,6 +432,8 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
             pn.initialMinIPAirwaySegmentation,
             pn.initialMinIPSegID,
         )
+        # Hide the minIP segmentation (to be able to see initial frame seg better)
+        self.logic.setItemsVisibility([pn.initialMinIPAirwaySegmentation], False)
 
     def onFindCarinaLocationsButtonClick(self):
         """Use the initial airway segmentation sequence to find the sequence
@@ -478,6 +505,13 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
             self.logic.transferSegmentationToAlignedMinIP(
                 pn.initialAirSegSeq, pn.alignedMinIP, pn.alignedMinIPSegmentation
             )
+        )
+        # Hide the transferred
+        self.logic.setItemsVisibility(
+            [
+                pn.initialAirSegSeq,
+            ],
+            showFlag=False,
         )
         # Also set it as the default input surface for centerline determination
         pn.cline_InputSurfaceNode = pn.alignedMinIPSegmentation
@@ -574,6 +608,8 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
                 "No initial crop box specified! Cropping and MinIP creation canceled!"
             )
             return
+        # Turn off interactive adjustment while cropping (and after)
+        pn.initialCropBox.GetDisplayNode().SetHandlesInteractive(False)
         # Inputs seem OK
         outputs = self.logic.runCropImagesAndCreateMinIP(
             pn.origImageSequenceNode,
@@ -583,11 +619,15 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
         # Store outputs
         pn.initialCroppedImageSeq = outputs["croppedSeq"]
         pn.initialMinIP = outputs["minIP"]
+        # No need to see the crop box anymore
+        pn.initialCropBox.GetDisplayNode().SetVisibility(False)
         # Initialize the initialMinIPSegmentation also
         pn.initialMinIPAirwaySegmentation, segID = self.logic.initializeInitMinIPSeg(
             pn.initialMinIP, pn.initialMinIPAirwaySegmentation
         )
         pn.initialMinIPSegID = segID
+        # Center the 3D view (so segment is visible in port)
+        self.logic.center3DView()
 
     def onRecropImagesAndCreateAlignedMinIPButtonClick(self):
         """Using the original images, aligned crop box ROI, and the carina transforms,
@@ -626,11 +666,12 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
         # Hide intial cropbox, initital minIP seg, and initial segmentation
         hideList = [
             pn.initialCropBox,
-            pn.initialAirSegSeq,
             pn.initialMinIPAirwaySegmentation,
             pn.alignedCropBox,
         ]
         self.logic.setItemsVisibility(hideList, False)
+        # don't hide pn.initialAirSegSeq because it is helpful to see and choose
+        # which frame gets transferred in the Transfer step...
 
     def onFindAndSmoothCenterlineButtonClick(self):
         """Use ExtractCenterline module to find centerline, and then smooth it"""
@@ -652,7 +693,8 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
             return
         finally:
             qt.QApplication.restoreOverrideCursor()
-
+        # Lock endpoints so they aren't accidentally moved
+        self.logic.setControlPointsLockedStatus(endPoints, lockedFlag=True)
         ## Fix orientation if endpoints were reversed
         carinaMarkup = pn.browserNode.GetProxyNode(pn.carinaLocationsSeqNode)
         self.logic.standardizeCenterlineOrientation(rawCenterline, carinaMarkup)
@@ -668,8 +710,9 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
             resampledOutputCurveNode=pn.smoothCenterline,
         )
         # Adjust visibility
-        self.logic.setItemsVisibility([rawCenterline], showFlag=False)
+        self.logic.setItemsVisibility([rawCenterline, endPoints], showFlag=False)
         self.logic.setItemsVisibility([pn.smoothCenterline], showFlag=True)
+        self.logic.setControlPointsLockedStatus(pn.smoothCenterline, lockedFlag=True)
         ## Finished
         slicer.util.showStatusMessage(
             "Centerline extraction, smoothing, and resampling is complete.", 3000
@@ -709,11 +752,14 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
         )
         # Hide ROI after quantification finishes
         volQuantROI.GetDisplayNode().SetVisibility(False)
-        # Also just store quantDat in the widget to avoid
+        # Also just store quantData in the widget to avoid
         # unnecessary serialization/deserialization cycles
         self.quantData = quantData
         self.makeDataTables(quantData)
         self.makeDataPlots()
+        # Ensure observation will update cross-section stuff when frame changes
+        if not self.browserObservation:
+            self.addBrowserObservation()
         self.initializeReviewSection()
 
     def makeDataTables(self, quantData=None):
@@ -1079,6 +1125,7 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
             * slice index display in 3D view
         """
         pn = self._parameterNode
+        scene = slicer.mrmlScene
         quantData = self.quantData
         nSlices = quantData["slicePoints"].shape[0]
         # Set slice slider maximum value
@@ -1087,6 +1134,23 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
         self.ui.sliceSlider.value = np.round(nSlices / 2)
         # Create review layout (3D, 3D, cross-section slice, plot)
         self.logic.switchToReviewLayout()
+        # Choose plots to show
+        plotNodes = [
+            pn.csaPlotChartNode,
+            pn.arPlotChartNode,
+            pn.arAxesPlotChartNode,
+            pn.volPlotChartNode,
+        ]
+        plotViewNodes = list(scene.GetNodesByClass("vtkMRMLPlotViewNode"))
+        if len(plotViewNodes) > len(plotNodes):
+            # We will run out of plot nodes before view nodes, shorten the list
+            plotViewNodes = plotViewNodes[: (len(plotNodes))]
+        for idx, plotViewNode in enumerate(plotViewNodes):
+            plotViewNode.SetPlotChartNodeID(plotNodes[idx].GetID())
+        # Make the quantified airway transparent
+        self.logic.setAirwayOpacity(
+            opacity=0.5, segSeqOrNode=pn.q_airwaySegmentationSequence
+        )
 
     def onFrameChange(self, unused1, unused2):
         """Called when review phase has been intialized and
@@ -1544,6 +1608,27 @@ class DynamicMalaciaToolsLogic(ScriptedLoadableModuleLogic):
     def getParameterNode(self):
         return DynamicMalaciaToolsParameterNode(super().getParameterNode())
 
+    def center3DView(self, viewIdx=0):
+        """Center 3D view (like clicking the center button)"""
+        layoutManager = slicer.app.layoutManager()
+        threeDWidget = layoutManager.threeDWidget(viewIdx)
+        threeDView = threeDWidget.threeDView()
+        threeDView.rotateToViewAxis(3)  # look from anterior direction
+        threeDView.resetFocalPoint()  # reset the 3D view cube size and center it
+        threeDView.resetCamera()  # reset camera zoom
+
+    def setAirwayOpacity(self, opacity, segSeqOrNode):
+        """Set opacity for segmentation node, or for the proxy node
+        of a supplied sequence node holding segmentations.
+        """
+        if type(segSeqOrNode) == vtkMRMLSequenceNode:
+            seqNode = segSeqOrNode
+            segNode = getFirstBrowser(seqNode).GetProxyNode(seqNode)
+        else:
+            segNode = segSeqOrNode
+        dn = segNode.GetDisplayNode()
+        dn.SetOpacity(opacity)
+
     def makeAirVolumePlot(self, tableNode, plotChartNode=None):
         """ """
         scene = slicer.mrmlScene
@@ -1937,7 +2022,7 @@ class DynamicMalaciaToolsLogic(ScriptedLoadableModuleLogic):
     def createReviewLayout(self, layoutIdNumber=555):
         """Create and register quantification review 4-up layout
         3D 1, 3D 2
-        crossSection, plot
+        plot, plot
         """
         customLayout = """
     <layout type="vertical" split="true">
@@ -1958,21 +2043,28 @@ class DynamicMalaciaToolsLogic(ScriptedLoadableModuleLogic):
         <item>
         <layout type="horizontal">
             <item>
-                <view class="vtkMRMLSliceNode" singletontag="CrossSection">
-                    <property name="orientation" action="default">Axial</property>
-                    <property name="viewlabel" action="default">CrossSection</property>
-                    <property name="viewcolor" action="default">#59CBDA</property>
+                <view class="vtkMRMLPlotViewNode" singletontag="Plot1">
+                    <property name="viewlabel" action="default">Plot1</property>
                 </view>
-            </item> 
+            </item>
             <item>
-                <view class="vtkMRMLPlotViewNode" singletontag="Plot">
-                    <property name="viewlabel" action="default">Plot</property>
+                <view class="vtkMRMLPlotViewNode" singletontag="Plot2">
+                    <property name="viewlabel" action="default">Plot2</property>
                 </view>
             </item>
         </layout>
         </item>
     </layout>
     """
+        # If wanted later for a cross-section-aligned slice node, just
+        # didn't want to delete the example.
+        sliceNodeAlternate = """<item>
+                <view class="vtkMRMLSliceNode" singletontag="CrossSection">
+                    <property name="orientation" action="default">Axial</property>
+                    <property name="viewlabel" action="default">CrossSection</property>
+                    <property name="viewcolor" action="default">#59CBDA</property>
+                </view>
+            </item> """
         layoutManager = slicer.app.layoutManager()
         layoutManager.layoutLogic().GetLayoutNode().AddLayoutDescription(
             layoutIdNumber, customLayout
@@ -1989,8 +2081,8 @@ class DynamicMalaciaToolsLogic(ScriptedLoadableModuleLogic):
                 customLayoutText
             )  # add inside layout list
             layoutSwitchAction.setData(layoutIdNumber)
-            layoutSwitchAction.setIcon(qt.QIcon(":Icons/LayoutThreeOverThreeView.png"))
-            layoutSwitchAction.setToolTip("6-view SEEG with 3D")
+            layoutSwitchAction.setIcon(qt.QIcon(":Icons/LayoutFourUpView.png"))
+            layoutSwitchAction.setToolTip("Malacia Review 4-UP")
             layoutSwitchAction.connect(
                 "triggered()",
                 lambda layoutId=layoutIdNumber: slicer.app.layoutManager().setLayout(
@@ -2166,7 +2258,7 @@ class DynamicMalaciaToolsLogic(ScriptedLoadableModuleLogic):
             windowTitle="Quantifying CSA, AR, and Volume...",
             labelText=f"Processing frame 0 of {nFrames}",
         )
-        slicePoints, sliceNormals = getCenterlineSlicerPointsAndNormals(centerline)
+        slicePoints, sliceNormals = getCenterlineSlicePointsAndNormals(centerline)
         nSlices = sliceNormals.shape[0]
         # Organize output arrays
         # Some are frames by points (CSA, AR, etc)
@@ -2568,6 +2660,8 @@ class DynamicMalaciaToolsLogic(ScriptedLoadableModuleLogic):
         # Standardize segment color
         segment = initMinIPSeg.GetSegmentation().GetSegment(segmentID)
         segment.SetColor(self.INIT_MINIP_SEG_COLOR)
+        # Create 3D surface
+        initMinIPSeg.CreateClosedSurfaceRepresentation()
         return initMinIPSeg, segmentID
 
     def setCarinaLocationsLockedStatus(self, carinaLocSeq, lockedFlag: bool):
@@ -2581,6 +2675,13 @@ class DynamicMalaciaToolsLogic(ScriptedLoadableModuleLogic):
             browser.SetSelectedItemNumber(idx)
             carinaNode.SetNthControlPointLocked(0, lockedFlag)
         browser.SetSelectedItemNumber(curFrameIdx)
+
+    def setControlPointsLockedStatus(self, markupsNode, lockedFlag: bool):
+        """Lock/unlock being able to move the markups control
+        points with the mouse. Done on each individual control point.
+        """
+        for idx in range(markupsNode.GetNumberOfControlPoints()):
+            markupsNode.SetNthControlPointLocked(idx, lockedFlag)
 
     def generateAlignedSegmentationSequence(
         self, imageSeg, minIPSeg, minIPSegmentID, outputSegSeq=None
@@ -4637,14 +4738,6 @@ def getROICornerPoints(roiNode, world=True) -> List[List[float]]:
     return corners
 
 
-def findVolume():
-    """Find the volume of a segment in a segmentation node which is
-    also inside of a supplied ROI.
-    The method will be to generate a
-    """
-    raise NotImplementedError
-
-
 def getAspectRatiosAndAreas(smoothCenterlineNode, segmentationNode, segmentIdx=0):
     """
     NO LONGER USED, REFACTORED AWAY
@@ -4684,7 +4777,7 @@ Currently, runQuantification does
 """
 
 
-def getCenterlineSlicerPointsAndNormals(
+def getCenterlineSlicePointsAndNormals(
     centerline: vtkMRMLMarkupsCurveNode,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """ """
@@ -5079,112 +5172,11 @@ def makeRangeCol(colName: str, data):
     return col
 
 
-def makeEnvPlot(dataTable, browserNode, distances, dataLabel="CSA"):
-    """Make an envelope plot of the CSA or AR data"""
-    # Convert dataTable to numpy array
-    dataArr = convertTableNodeToNumpy(dataTable)
-    lowestData = np.min(dataArr, axis=1)
-    highestData = np.max(dataArr, axis=1)
-    # Make these back into table a table node so that it can be referenced
-    # by plotSeries nodes
-    vLowestCol = vtk.vtkFloatArray()
-    vLowestCol.SetName(f"Min{dataLabel}")
-    vHighestCol = vtk.vtkFloatArray()
-    vHighestCol.SetName(f"Max{dataLabel}")
-    vDistCol = vtk.vtkFloatArray()
-    vDistCol.SetName("DistanceToCarinaMm")
-    vInvDistCol = vtk.vtkFloatArray()
-    vInvDistCol.SetName("-DistanceToCarinaMm")
-    vIdxCol = vtk.vtkFloatArray()
-    vIdxCol.SetName("CenterlinePointIndex")
-    plotIdxFlag = distances is None
-    if distances is None:
-        # Just plot vs point index
-        distances = list(range(dataArr.shape[0]))
-    for idx in range(lowestData.size):
-        vLowestCol.InsertNextValue(lowestData[idx])
-        vHighestCol.InsertNextValue(highestData[idx])
-        vDistCol.InsertNextValue(distances[idx])
-        vInvDistCol.InsertNextValue(-distances[idx])
-        vIdxCol.InsertNextValue(idx)
-    # Create table node to hold envelope
-    envTableNode = slicer.mrmlScene.AddNewNodeByClass(
-        "vtkMRMLTableNode",
-        slicer.mrmlScene.GenerateUniqueName(f"{dataLabel}_EnvelopeTable"),
-    )
-    envTableNode.AddColumn(vLowestCol)
-    envTableNode.AddColumn(vHighestCol)
-    envTableNode.AddColumn(vDistCol)
-    envTableNode.AddColumn(vInvDistCol)
-    envTableNode.AddColumn(vIdxCol)
-    # Make plot series for each of these
-    lowPlotSeries = slicer.mrmlScene.AddNewNodeByClass(
-        "vtkMRMLPlotSeriesNode", f"Min{dataLabel}"
-    )
-    lowPlotSeries.SetAndObserveTableNodeID(envTableNode.GetID())
-    if plotIdxFlag:
-        xColName = "CenterlinePointIndex"
-    else:
-        xColName = "-DistanceToCarinaMm"
-    lowPlotSeries.SetXColumnName(xColName)
-    lowPlotSeries.SetYColumnName(f"Min{dataLabel}")
-    lowPlotSeries.SetPlotType(slicer.vtkMRMLPlotSeriesNode.PlotTypeScatter)
-    gray = [0.75, 0.75, 0.75]
-    lowPlotSeries.SetColor(gray)
-    highPlotSeries = slicer.mrmlScene.AddNewNodeByClass(
-        "vtkMRMLPlotSeriesNode", f"Max{dataLabel}"
-    )
-    highPlotSeries.SetAndObserveTableNodeID(envTableNode.GetID())
-    highPlotSeries.SetXColumnName(xColName)
-    highPlotSeries.SetYColumnName(f"Max{dataLabel}")
-    highPlotSeries.SetPlotType(slicer.vtkMRMLPlotSeriesNode.PlotTypeScatter)
-    highPlotSeries.SetColor(gray)
-    # Make plot series for dynamic one using the proxy node of a sequence
-    xCol = envTableNode.GetTable().GetColumnByName(xColName)
-    dataTableSeq = tableSeqFromArray(dataArr, xCol, browserNode, dataLabel)
-    proxyTableNode = browserNode.GetProxyNode(dataTableSeq)
-    dynPlotSeries = slicer.mrmlScene.AddNewNodeByClass(
-        "vtkMRMLPlotSeriesNode", f"Frame_{dataLabel}"
-    )
-    dynPlotSeries.SetAndObserveTableNodeID(proxyTableNode.GetID())
-    dynPlotSeries.SetXColumnName(xColName)
-    dynPlotSeries.SetYColumnName(f"{dataLabel}")
-    dynPlotSeries.SetPlotType(slicer.vtkMRMLPlotSeriesNode.PlotTypeScatter)
-    dynPlotSeries.SetColor([0, 0, 1])
-    # Set up plotChart
-    plotChartNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLPlotChartNode")
-    plotChartNode.SetName(slicer.mrmlScene.GenerateUniqueName(f"{dataLabel}_Dynamic"))
-    for plotSeries in [lowPlotSeries, highPlotSeries, dynPlotSeries]:
-        plotChartNode.AddAndObservePlotSeriesNodeID(plotSeries.GetID())
-    plotChartNode.SetXAxisTitle(xColName)
-    yLabel = "Cross-sectional Area mm^2" if dataLabel == "CSA" else "Aspect Ratio"
-    plotChartNode.SetYAxisTitle(yLabel)
-    # Show it
-    showPlot(plotChartNode)
-    return plotChartNode, (lowPlotSeries, highPlotSeries, dynPlotSeries)
-
-
 def showPlot(chartNode):
     showPlotLayoutNum = 36
     slicer.app.layoutManager().setLayout(showPlotLayoutNum)
     plotViewNode = slicer.mrmlScene.GetFirstNodeByClass("vtkMRMLPlotViewNode")
     plotViewNode.SetPlotChartNodeID(chartNode.GetID())
-
-
-def convertTableNodeToNumpy(tableNode):
-    """Hacky conversion, beware of errors or weird effects if you
-    input a table with anything other than straight numbers in equal
-    length columns...
-    """
-    temp_npcols = []
-    for idx in range(tableNode.GetTable().GetNumberOfColumns()):
-        vtkArr = tableNode.GetTable().GetColumn(idx)
-        # Can implement skipping of column here if needed
-        npArr = numpy_support.vtk_to_numpy(vtkArr)
-        temp_npcols.append(npArr)
-    # Stack them all into the final numpy array
-    arr = np.column_stack(temp_npcols)
-    return arr
 
 
 def serialize_dict_with_ndarrays(data_dict):
