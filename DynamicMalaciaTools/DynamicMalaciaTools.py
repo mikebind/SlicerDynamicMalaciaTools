@@ -1952,6 +1952,9 @@ class DynamicMalaciaToolsLogic(ScriptedLoadableModuleLogic):
         col = tableNode.GetTable().GetColumnByName(colName)
         col.SetValue(0, dist)
         col.SetValue(1, dist)
+        # The table node is not automatically updated, we have to
+        # trigger it
+        tableNode.Modified()
 
     def getCarinaLocation(
         self, carinaLocSeqNode, currentlyAlignedFlag, alignmentTransformSeq
