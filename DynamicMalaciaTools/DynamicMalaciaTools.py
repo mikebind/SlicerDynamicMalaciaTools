@@ -355,7 +355,7 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
         has changed).
         """
         if self.browserObservation:
-            self.removeBrowserObservation
+            self.removeBrowserObservation()
         self.addBrowserObservation(self.getBrowserNode())
 
     def addBrowserObservation(self, browser):
@@ -730,8 +730,8 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
         self.quantData = quantData
         self.makeDataTables(quantData)
         self.makeDataPlots()
-        # Ensure observation will update cross-section stuff when frame changes
-        self.updateBrowserObservation()
+        # Change layout and ensure observation will update
+        # cross-section stuff when frame changes
         self.initializeReviewSection()
 
     def makeDataTables(self, quantData=None):
@@ -1123,6 +1123,8 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
         self.logic.setAirwayOpacity(
             opacity=0.5, segSeqOrNode=pn.q_airwaySegmentationSequence
         )
+        # Ensure the browser is observed
+        self.updateBrowserObservation()
 
     def onFrameChange(self, unused1, unused2):
         """Called when review phase has been intialized and
