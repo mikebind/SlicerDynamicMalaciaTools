@@ -2263,6 +2263,18 @@ class DynamicMalaciaToolsLogic(ScriptedLoadableModuleLogic):
             surf = pv.wrap(airPolyData)
             for sliceIdx, (point, normal) in enumerate(zip(slicePoints, sliceNormals)):
                 clip = surf.slice(normal=normal, origin=point)
+                if clip.n_points == 0:
+                    # Most likely, the slicing plane missed the airway surface!
+                    # What should be done in this case?
+                    logging.warning(
+                        f"Slice {sliceIdx} in frame {frameIdx} generated no points when clipped!"
+                    )
+                    # For now, just throw an exception because we have no way of handling missing data
+                    # in the plots/slice models/long axis/short axis/etc.
+                    raise RuntimeError(
+                        f"Slice {sliceIdx} in frame {frameIdx} generated no points when clipped!"
+                    )
+                    # TODO: consider automatically cleaning up volume regions up to this point
                 clip_connected = clip.connectivity("closest", closest_point=point)
                 arDataDict = compute_aspect_ratio(clip_connected, normal)
                 ar = arDataDict["aspectRatio"]
