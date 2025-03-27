@@ -20,7 +20,13 @@ import numpy as np
 import re
 import traceback
 import pathlib
-import pyvista as pv
+
+try:
+    import pyvista as pv
+except ImportError:
+    slicer.util.pip_install("pyvista")
+    import pyvista as pv
+
 from scipy.spatial.distance import cdist
 from scipy.spatial.transform import Rotation
 
@@ -104,7 +110,7 @@ class DynamicMalaciaToolsParameterNode:
 
     #### Source Data
     origImageSequenceNode: vtkMRMLSequenceNode = None
-    browserNode: vtkMRMLSequenceBrowserNode = None
+    # browserNode: vtkMRMLSequenceBrowserNode = None
     temporalStep: float = 0.1
     #### Initial Segmentation Phase
     initialCropBox: vtkMRMLMarkupsROINode = None
@@ -211,6 +217,7 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
         self._parameterNodeGuiTag = None
         self.quantData = None
         self.browserObservation = None
+        self.updatingOrigSeq = False
 
     def setup(self) -> None:
         """Called when the user opens the module the first time and the widget is initialized."""
@@ -267,9 +274,10 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
             self.onCenterlineSegmentSelectionChange,
         )
         # Anything else which needs to be handled via a separate connection
-        self.ui.origImageSequenceNodeSelector.connect(
-            "currentNodeChanged(vtkMRMLNode*)", self.onOrigImageSequenceSelectionChange
-        )
+        # self.ui.origImageSequenceNodeSelector.connect(
+        #    "currentNodeChanged(vtkMRMLNode*)",
+        #    self.onOrigTest,  # self.onOrigImageSequenceSelectionChange
+        # )
 
         # These connections ensure that we update parameter node when scene is closed
         self.addObserver(
@@ -340,26 +348,22 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
         #    self._parameterNode.segmentationSequence
         # )
 
-    def onOrigImageSequenceSelectionChange(self, node):
-        """Update the browser node when the original sequence is set"""
-        pn = self._parameterNode
-        pn.origImageSequenceNode = node
-        if node:
-            pn.browserNode = getFirstBrowser(node)
-            self.addBrowserObservation()
-        elif self.browserObservation:
-            # node is None, and there is a prior observation we need to remove
-            self.removeBrowserObservation()
-            # self.hasObserver(pn.browserNode, pn.browserNode.ProxyNodeModifiedEvent, self.onFrameChange)
-        # Currently does not reset/remove the browser node if the selection
-        # changes to None.
+    def updateBrowserObservation(self):
+        """Make sure browser is observed and linked to the current browser.
+        Should be called when runQuantification is run. Removes any
+        existing browser observation (in case the original sequence
+        has changed).
+        """
+        if self.browserObservation:
+            self.removeBrowserObservation
+        self.addBrowserObservation(self.getBrowserNode())
 
-    def addBrowserObservation(self):
+    def addBrowserObservation(self, browser):
         """Register onFrameChange callback to update cross section and arAxes
         when browser frame changes
         """
-        pn = self._parameterNode
-        if not pn.browserNode:
+        # pn = self._parameterNode
+        if not browser:
             logging.warning("No browser to observe!")
             return
         if self.browserObservation:
@@ -368,15 +372,15 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
             )
             # Consider: Could also potentially auto-remove here before adding new one...
         self.addObserver(
-            pn.browserNode,
-            pn.browserNode.ProxyNodeModifiedEvent,
+            browser,
+            browser.ProxyNodeModifiedEvent,
             self.onFrameChange,
         )
         # Store record of observation so it can be removed as needed
         logging.info("Adding browser observation.")
         self.browserObservation = (
-            pn.browserNode,
-            pn.browserNode.ProxyNodeModifiedEvent,
+            browser,
+            browser.ProxyNodeModifiedEvent,
             self.onFrameChange,
         )
 
@@ -388,7 +392,26 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
             logging.warning("No stored browser observation to remove!")
             return
         self.removeObserver(*(self.browserObservation))
+        self.browserObservation = None
         logging.info("Removed browser observation.")
+
+    def getBrowserNode(self):
+        """Get the the browser node linked to the original sequence node. If
+        a different browser node is needed, code can be added here to allow
+        a way of selecting it.
+        """
+        pn = self._parameterNode
+        if not pn.origImageSequenceNode:
+            return None
+        browser = getFirstBrowser(pn.origImageSequenceNode)
+        return browser
+
+    def getProxyNode(self, seqNode):
+        """Get the proxy node for the sequence node from the browser"""
+        browser = self.getBrowserNode()
+        if browser is None:
+            return None
+        return browser.GetProxyNode(seqNode)
 
     def onCreateNewVolumeQuantROIButtonClick(self):
         """Create a new volume quantification ROI node.  Base it on
@@ -405,7 +428,7 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
         """
         pn = self._parameterNode
         # Create or update the initial crop ROI
-        origProxyNode = pn.browserNode.GetProxyNode(pn.origImageSequenceNode)
+        origProxyNode = self.getProxyNode(pn.origImageSequenceNode)
         pn.initialCropBox = self.logic.initializeInitCropBox(
             refVolNode=origProxyNode, initialCropBox=None
         )
@@ -541,56 +564,6 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
             showFlag=False,
         )
 
-    def onInitializeRegistrationButtonClick(self):
-        """NO LONGER USED"""
-        """Create nodes to be filled in by registration process
-        Needs to create:
-        * Initial auto-generated Air segmentation on first frame of original
-          image sequence (unchanged if exists)
-        * Initial carina landmark node (unchanged if exists)
-        * Initial crop box (fit to original image sequence, then user modifies)
-        * Output linear transform sequence (to hold linear transforms aligning
-          carina points)
-        * Output nonlinear transform sequence 1 (to hold transforms enabling
-          averaging to create template image)
-        * Output nonlinear transform sequence 2 (to hold transforms from
-          template image to each individual frame)
-        ----
-        If these nodes do not exist, they should be created. If they do exist,
-        then they should be handled variously.
-        """
-        logging.info("Running registration initialization...")
-        pn = self._parameterNode
-
-        outputNamedTuple = self.logic.initializeRegistrationPhase(
-            origImageSequenceNode=pn.origImageSequenceNode,
-            browserNode=pn.browserNode,
-            initialCarinaLandmark=pn.initialCarinaLandmark,
-            initialCropBox=pn.initialCropBox,
-            nonLinAlignTformSeq1=pn.nonLinAlignTformSeq1,
-            nonLinAlignTformSeq2=pn.nonLinAlignTformSeq2,
-            carinaAlignmentTransformSeq=pn.carinaAlignmentTransformSeq,
-        )
-        pn.origImageSequenceNode = outputNamedTuple.origImageSequenceNode
-        pn.browserNode = outputNamedTuple.browserNode
-        pn.initialCarinaLandmark = outputNamedTuple.initialCarinaLandmark
-        pn.initialCropBox = outputNamedTuple.initialCropBox
-        pn.nonLinAlignTformSeq1 = outputNamedTuple.nonLinAlignTformSeq1
-        pn.nonLinAlignTformSeq2 = outputNamedTuple.nonLinAlignTformSeq2
-        pn.carinaAlignmentTransformSeq = outputNamedTuple.carinaAlignmentTransformSeq
-        logging.info("Pre-registration initialization complete!")
-
-    def onRunCarinaRegistrationButton(self):
-        """NO LONGER USED"""
-        """Run the multi-stage carina registration."""
-        pn = self._parameterNode
-        logging.info("Beginning multi-stage carina registration...")
-        self.logic.runCarinaRegistration(inputs_go_here)
-        logging.info("Completed multi-stage carina registration!")
-        # Create draft trachea crop box?
-        if not pn.tracheaCropBox:
-            pn.tracheaCropBox = self.logic.createDraftTracheaCropBox(pn.initialCropBox)
-
     def onCropImagesAndCreateMinIPButtonClick(self):
         """Crop image sequence using initialCropROI on the original images (no transforms),
         and create the initialMinIP image.  Go ahead and create the initialMinIPSegmentation
@@ -696,7 +669,7 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
         # Lock endpoints so they aren't accidentally moved
         self.logic.setControlPointsLockedStatus(endPoints, lockedFlag=True)
         ## Fix orientation if endpoints were reversed
-        carinaMarkup = pn.browserNode.GetProxyNode(pn.carinaLocationsSeqNode)
+        carinaMarkup = self.getProxyNode(pn.carinaLocationsSeqNode)
         self.logic.standardizeCenterlineOrientation(rawCenterline, carinaMarkup)
         pn.rawCenterline = rawCenterline
         ## Smooth centerline
@@ -758,8 +731,7 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
         self.makeDataTables(quantData)
         self.makeDataPlots()
         # Ensure observation will update cross-section stuff when frame changes
-        if not self.browserObservation:
-            self.addBrowserObservation()
+        self.updateBrowserObservation()
         self.initializeReviewSection()
 
     def makeDataTables(self, quantData=None):
@@ -855,7 +827,7 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
         pn.csaTableSeq = tableSeqFromArray(
             np.transpose(csaData),
             xCol=carinaDistsCol,
-            browserNode=pn.browserNode,
+            browserNode=self.getBrowserNode(),
             dataLabel="CSA",
         )
         pn.csaTableSeq.SetName("CSA_Table_Seq")
@@ -863,15 +835,15 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
         progressBar.value = 5
         slicer.app.processEvents()
         # Set the name
-        pn.browserNode.GetProxyNode(pn.csaTableSeq).SetName("dynCSATable")
+        self.getProxyNode(pn.csaTableSeq).SetName("dynCSATable")
         pn.arTableSeq = tableSeqFromArray(
             np.transpose(arData),
             xCol=carinaDistsCol,
-            browserNode=pn.browserNode,
+            browserNode=self.getBrowserNode(),
             dataLabel="AR",
         )
         pn.arTableSeq.SetName("AR_Table_Seq")
-        pn.browserNode.GetProxyNode(pn.arTableSeq).SetName("dynARTable")
+        self.getProxyNode(pn.arTableSeq).SetName("dynARTable")
         # update progress bar
         progressBar.value = 6
         slicer.app.processEvents()
@@ -891,14 +863,14 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
         pn.longTableSeq = tableSeqFromArray(
             np.transpose(longAxisLength),
             xCol=carinaDistsCol,
-            browserNode=pn.browserNode,
+            browserNode=self.getBrowserNode(),
             dataLabel="LongAxis",
         )
         pn.longTableSeq.SetName("LongAxisLength_Seq")
         # update progress bar
         progressBar.value = 8
         slicer.app.processEvents()
-        pn.browserNode.GetProxyNode(pn.longTableSeq).SetName("dynLongAxisTable")
+        self.getProxyNode(pn.longTableSeq).SetName("dynLongAxisTable")
         shortAxisData = quantData["shortAxisData"]
         shortAxisLength = np.squeeze(shortAxisData[:, :, 0])
         pn.shortAxisTable = tableNodeFromArray(
@@ -914,11 +886,11 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
         pn.shortTableSeq = tableSeqFromArray(
             np.transpose(shortAxisLength),
             xCol=carinaDistsCol,
-            browserNode=pn.browserNode,
+            browserNode=self.getBrowserNode(),
             dataLabel="ShortAxis",
         )
         pn.shortTableSeq.SetName("ShortAxisLength_Seq")
-        pn.browserNode.GetProxyNode(pn.shortTableSeq).SetName("dynShortAxisTable")
+        self.getProxyNode(pn.shortTableSeq).SetName("dynShortAxisTable")
         # update progress bar
         progressBar.value = 10
         slicer.app.processEvents()
@@ -976,7 +948,7 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
         # Generate the interactive figures from the tables
         # pn.csaPlotChartNode, (low, high, dyn) = makeEnvPlot()
         pn = self._parameterNode
-        browser = pn.browserNode
+        browser = self.getBrowserNode()
 
         nPlots = 4
         progressBar = createProgressDialog(
@@ -1076,7 +1048,7 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
         sliceIdx = int(pn.sliceSliderIdx)
         slicePoint = quantData["slicePoints"][sliceIdx, :]
         sliceNormal = quantData["sliceNormals"][sliceIdx, :]
-        airSeg = pn.browserNode.GetProxyNode(pn.q_airwaySegmentationSequence)
+        airSeg = self.getProxyNode(pn.q_airwaySegmentationSequence)
         segmentIdx = pn.q_segmentIdx
         pn.crossSectionModel = self.logic.updateCrossSectionModel(
             slicePoint,
@@ -1098,7 +1070,7 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
             )
             return
         sliceIdx = int(pn.sliceSliderIdx)
-        frameIdx = pn.browserNode.GetSelectedItemNumber()
+        frameIdx = self.getBrowserNode().GetSelectedItemNumber()
         quantData = self.quantData
         (long1, long2, short1, short2) = self.logic.getArAxisPoints(
             quantData, frameIdx, sliceIdx
@@ -1186,6 +1158,7 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
         if pn.updatingSliceIdx:
             return
         # Avoid recursion
+        prior = pn.updatingSliceIdx
         pn.updatingSliceIdx = True
         # Perform updates
         pn.sliceSliderIdx = newSliceIdx
@@ -1196,7 +1169,7 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
         self.updateSliceIndicatorTableCarinaDistance()
         slicer.app.processEvents()
         # Done
-        pn.updatingSliceIdx = False  # should this be prior value?
+        pn.updatingSliceIdx = prior  # should this be prior value or just False?
 
     def updateSliceIndicatorTableCarinaDistance(self):
         """Wrapper for logic.updateSliceIndicatorTableCarinaDistance"""
@@ -1402,7 +1375,9 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
     def enter(self) -> None:
         """Called each time the user opens this module."""
         # Make sure parameter node exists and observed
+        print("entering...")
         self.initializeParameterNode()
+        print("entered, after init param node...")
 
     def exit(self) -> None:
         """Called each time the user opens a different module."""
@@ -1604,6 +1579,7 @@ class DynamicMalaciaToolsLogic(ScriptedLoadableModuleLogic):
         self.SLICE_INDICATOR_LINE_STYLE = vtkMRMLPlotSeriesNode.LineStyleSolid
         self.SLICE_INDICATOR_LINE_WIDTH = 1
         self.AIR_VOL_SEGMENT_COLOR = (0, 0, 0.75)  # dark blue
+        #
 
     def getParameterNode(self):
         return DynamicMalaciaToolsParameterNode(super().getParameterNode())
