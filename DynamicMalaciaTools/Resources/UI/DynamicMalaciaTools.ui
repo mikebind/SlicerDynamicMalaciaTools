@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>482</width>
-    <height>1572</height>
+    <width>547</width>
+    <height>1694</height>
    </rect>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
@@ -756,14 +756,14 @@
         </property>
        </widget>
       </item>
-      <item row="3" column="0">
-       <widget class="QLabel" name="label_29">
+      <item row="10" column="0">
+       <widget class="QLabel" name="timeIndexLabel">
         <property name="text">
          <string>Time Index</string>
         </property>
        </widget>
       </item>
-      <item row="3" column="1">
+      <item row="10" column="1">
        <widget class="ctkSliderWidget" name="timeStepSlider">
         <property name="enabled">
          <bool>false</bool>
@@ -776,14 +776,7 @@
         </property>
        </widget>
       </item>
-      <item row="4" column="0">
-       <widget class="QLabel" name="label_32">
-        <property name="text">
-         <string>Display controls:</string>
-        </property>
-       </widget>
-      </item>
-      <item row="5" column="0">
+      <item row="12" column="0">
        <widget class="QCheckBox" name="showEnvCurvesFlag">
         <property name="text">
          <string>Show envelope curves</string>
@@ -793,7 +786,7 @@
         </property>
        </widget>
       </item>
-      <item row="5" column="1">
+      <item row="12" column="1">
        <widget class="QCheckBox" name="showCurrentSlice3DCheckBox">
         <property name="text">
          <string>Show current slice on 3D</string>
@@ -803,27 +796,27 @@
         </property>
        </widget>
       </item>
-      <item row="6" column="0">
+      <item row="13" column="0">
        <widget class="QCheckBox" name="showCurrentTimeCheckBox">
         <property name="text">
-         <string>Show current time</string>
+         <string>Show current curve</string>
         </property>
         <property name="SlicerParameterName" stdset="0">
-         <string>showCurrentTimeFlag</string>
+         <string>showCurrentCurveFlag</string>
         </property>
        </widget>
       </item>
-      <item row="6" column="1">
+      <item row="13" column="1">
        <widget class="QCheckBox" name="showARLinesCheckBox">
         <property name="text">
-         <string>Show AR lines</string>
+         <string>Show AR lines on 3D</string>
         </property>
         <property name="SlicerParameterName" stdset="0">
          <string>showARLinesFlag</string>
         </property>
        </widget>
       </item>
-      <item row="7" column="0" colspan="2">
+      <item row="15" column="0" colspan="2">
        <layout class="QHBoxLayout" name="horizontalLayout_3">
         <property name="topMargin">
          <number>10</number>
@@ -886,14 +879,14 @@
         </item>
        </layout>
       </item>
-      <item row="8" column="0">
+      <item row="16" column="0">
        <widget class="QLabel" name="label_27">
         <property name="text">
          <string>Save Directory</string>
         </property>
        </widget>
       </item>
-      <item row="8" column="1">
+      <item row="16" column="1">
        <widget class="ctkPathLineEdit" name="saveDirPathEdit">
         <property name="filters">
          <set>ctkPathLineEdit::Dirs|ctkPathLineEdit::NoDot|ctkPathLineEdit::NoDotDot</set>
@@ -906,10 +899,165 @@
         </property>
        </widget>
       </item>
-      <item row="9" column="0" colspan="2">
+      <item row="17" column="0" colspan="2">
        <widget class="QPushButton" name="saveResultsButton">
         <property name="text">
          <string>Save Results</string>
+        </property>
+       </widget>
+      </item>
+      <item row="5" column="0">
+       <widget class="QLabel" name="label">
+        <property name="toolTip">
+         <string>Range of distances from carina to show along X-axis in plots</string>
+        </property>
+        <property name="text">
+         <string>Plotting Range (X)</string>
+        </property>
+       </widget>
+      </item>
+      <item row="4" column="0">
+       <widget class="QLabel" name="label_32">
+        <property name="text">
+         <string>Display controls:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="3" column="0">
+       <widget class="QLabel" name="label_8">
+        <property name="text">
+         <string>Slice Distance from Carina</string>
+        </property>
+       </widget>
+      </item>
+      <item row="3" column="1">
+       <widget class="QLabel" name="carinaDistText">
+        <property name="enabled">
+         <bool>false</bool>
+        </property>
+        <property name="toolTip">
+         <string>The distance of the current centerline slicing point from the carina</string>
+        </property>
+        <property name="text">
+         <string>(run quantification first)</string>
+        </property>
+       </widget>
+      </item>
+      <item row="5" column="1">
+       <layout class="QHBoxLayout" name="horizontalLayout_6">
+        <property name="leftMargin">
+         <number>0</number>
+        </property>
+        <property name="topMargin">
+         <number>0</number>
+        </property>
+        <item>
+         <widget class="ctkRangeWidget" name="carinaDistPlotRangeSlider">
+          <property name="toolTip">
+           <string>Distance from carina plotting range (to exclude branch regions near carina and image superior edges)</string>
+          </property>
+          <property name="decimals">
+           <number>0</number>
+          </property>
+          <property name="maximum">
+           <double>75.000000000000000</double>
+          </property>
+          <property name="minimumValue">
+           <double>5.000000000000000</double>
+          </property>
+          <property name="maximumValue">
+           <double>60.000000000000000</double>
+          </property>
+          <property name="suffix">
+           <string> mm</string>
+          </property>
+          <property name="tracking">
+           <bool>false</bool>
+          </property>
+          <property name="SlicerParameterName" stdset="0">
+           <string>carinaDistPlotRangeMm</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="applyXRangeButton">
+          <property name="text">
+           <string>Apply</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+      <item row="6" column="0">
+       <widget class="QLabel" name="label_2">
+        <property name="text">
+         <string>Max CSA Y-axis Value</string>
+        </property>
+       </widget>
+      </item>
+      <item row="6" column="1">
+       <layout class="QHBoxLayout" name="horizontalLayout_7">
+        <property name="topMargin">
+         <number>0</number>
+        </property>
+        <item>
+         <widget class="QDoubleSpinBox" name="maxY_CSA">
+          <property name="suffix">
+           <string> mm^2</string>
+          </property>
+          <property name="decimals">
+           <number>0</number>
+          </property>
+          <property name="maximum">
+           <double>1000.000000000000000</double>
+          </property>
+          <property name="singleStep">
+           <double>5.000000000000000</double>
+          </property>
+          <property name="SlicerParameterName" stdset="0">
+           <string>maxY_CSA</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <spacer name="horizontalSpacer_4">
+          <property name="orientation">
+           <enum>Qt::Horizontal</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>40</width>
+            <height>20</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
+        <item>
+         <widget class="QPushButton" name="applyYMaxButton">
+          <property name="text">
+           <string>Apply</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+      <item row="14" column="1">
+       <widget class="QCheckBox" name="checkBox">
+        <property name="text">
+         <string>Show slice indicator on plots</string>
+        </property>
+        <property name="SlicerParameterName" stdset="0">
+         <string>showSliceIndicatorOnPlotsFlag</string>
+        </property>
+       </widget>
+      </item>
+      <item row="14" column="0">
+       <widget class="QCheckBox" name="checkBox_2">
+        <property name="text">
+         <string>Show legend</string>
+        </property>
+        <property name="SlicerParameterName" stdset="0">
+         <string>showLegendFlag</string>
         </property>
        </widget>
       </item>
@@ -942,6 +1090,11 @@
    <class>ctkPathLineEdit</class>
    <extends>QWidget</extends>
    <header>ctkPathLineEdit.h</header>
+  </customwidget>
+  <customwidget>
+   <class>ctkRangeWidget</class>
+   <extends>QWidget</extends>
+   <header>ctkRangeWidget.h</header>
   </customwidget>
   <customwidget>
    <class>ctkSliderWidget</class>

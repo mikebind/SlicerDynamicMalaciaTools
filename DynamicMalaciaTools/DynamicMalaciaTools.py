@@ -13,6 +13,8 @@ from slicer.util import VTKObservationMixin
 from slicer.parameterNodeWrapper import (
     parameterNodeWrapper,
     WithinRange,
+    FloatRange,
+    RangeBounds,
 )
 
 import json
@@ -95,6 +97,9 @@ This file was originally developed by Mike Bindschadler as part of work at Seatt
         # Skip sample data registration for now (until we have a sample data set we want to use)
         ### # Additional initialization step after application startup is complete
         ### slicer.app.connect("startupCompleted()", registerSampleData)
+        # Register custom layouts on load
+        tempLogic = DynamicMalaciaToolsLogic()
+        slicer.app.startupCompleted.connect(lambda: tempLogic.createReviewLayout())
 
 
 #
@@ -176,21 +181,44 @@ class DynamicMalaciaToolsParameterNode:
     sliceSliderIdx: Annotated[float, WithinRange(0, 100)] = 0
     sequenceSliderIdx: Annotated[float, WithinRange(0, 40)] = 0
     # ^^ these indexes need to be coerced to int wherever used!
+    carinaDistPlotRangeMm: Annotated[FloatRange, RangeBounds(0.0, 100.0)] = FloatRange(
+        5.0, 60.0
+    )
+    updatingCarinaPlotRange: bool = False
+    maxY_CSA: float = 130.0
     # plot handles?? what else here?
     crossSectionModel: vtkMRMLModelNode
     longAxisLine: vtkMRMLMarkupsCurveNode
     shortAxisLine: vtkMRMLMarkupsCurveNode
 
     csaPlotChartNode: vtkMRMLPlotChartNode
+    csaPlotSeriesMaxCSA: vtkMRMLPlotSeriesNode
+    csaPlotSeriesMinCSA: vtkMRMLPlotSeriesNode
+    csaPlotSeriesCurSlice: vtkMRMLPlotSeriesNode
+    csaPlotSeriesDynCSA: vtkMRMLPlotSeriesNode
     arPlotChartNode: vtkMRMLPlotChartNode
+    arPlotSeriesMaxAR: vtkMRMLPlotSeriesNode
+    arPlotSeriesMinAR: vtkMRMLPlotSeriesNode
+    arPlotSeriesCurSlice: vtkMRMLPlotSeriesNode
+    arPlotSeriesDynAR: vtkMRMLPlotSeriesNode
     arAxesPlotChartNode: vtkMRMLPlotChartNode
+    arAxesPlotSeriesLongMax: vtkMRMLPlotSeriesNode
+    arAxesPlotSeriesLongMin: vtkMRMLPlotSeriesNode
+    arAxesPlotSeriesShortMax: vtkMRMLPlotSeriesNode
+    arAxesPlotSeriesShortMin: vtkMRMLPlotSeriesNode
+    arAxesPlotSeriesCurSlice: vtkMRMLPlotSeriesNode
+    arAxesPlotSeriesShortDyn: vtkMRMLPlotSeriesNode
+    arAxesPlotSeriesLongDyn: vtkMRMLPlotSeriesNode
     volPlotChartNode: vtkMRMLPlotChartNode
 
     # display checkboxes
     showEnvCurvesFlag: bool = True
-    showCurrentTimeFlag: bool = True
+    showCurrentCurveFlag: bool = True
     showCurrentSlice3DFlag: bool = True
     showARLinesFlag: bool = True
+    showSliceIndicatorOnPlotsFlag: bool = True
+    showLegendFlag: bool = True
+
     # Save location
     saveDirectory: pathlib.Path
 
@@ -326,6 +354,8 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
         ui.findAndSmoothCenterlineButton.clicked.connect(
             self.onFindAndSmoothCenterlineButtonClick
         )
+        ui.applyXRangeButton.clicked.connect(self.onApplyXRangeButtonClick)
+        ui.applyYMaxButton.clicked.connect(self.onApplyYMaxCSAButtonClick)
         ui.switchToReviewLayoutButton.clicked.connect(self.logic.switchToReviewLayout)
         ui.switchToRegularLayoutButton.clicked.connect(self.logic.switchToRegularLayout)
 
@@ -338,10 +368,44 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
         # Connect slice slider
         ui.sliceSlider.connect("valueChanged(double)", self.onSliceSliderValueChange)
 
+        # ui.carinaDistPlotRangeSlider.connect(
+        #    "valuesChanged(double,double)", self.onCarinaDistPlotRangeSliderChange
+        # )
+        # Hide unused slider and label
+        ui.timeStepSlider.hide()
+        ui.timeIndexLabel.hide()
+
         # Make sure parameter node is initialized (needed for module reload)
         self.initializeParameterNode()
+
         # Ensure that the custom review layout is created before it is needed
         self.logic.createReviewLayout()
+
+        # Plot series didn't used to be stored in the parameter node. For backwards
+        # compatibility, connect these if the plots exist but the series are not in
+        # the parameter node
+        pn = self._parameterNode
+        if pn.csaPlotChartNode and not pn.csaPlotSeriesDynCSA:
+            # Plot series parameter node references need to be updated
+            pn.arPlotSeriesMaxAR = pn.arPlotChartNode.GetNthPlotSeriesNode(0)
+            pn.arPlotSeriesMinAR = pn.arPlotChartNode.GetNthPlotSeriesNode(1)
+            pn.arPlotSeriesCurSlice = pn.arPlotChartNode.GetNthPlotSeriesNode(2)
+            pn.arPlotSeriesDynAR = pn.arPlotChartNode.GetNthPlotSeriesNode(3)
+
+            pn.arAxesPlotSeriesLongMax = pn.arAxesPlotChartNode.GetNthPlotSeriesNode(0)
+            pn.arAxesPlotSeriesLongMin = pn.arAxesPlotChartNode.GetNthPlotSeriesNode(1)
+            pn.arAxesPlotSeriesShortMax = pn.arAxesPlotChartNode.GetNthPlotSeriesNode(2)
+            pn.arAxesPlotSeriesShortMin = pn.arAxesPlotChartNode.GetNthPlotSeriesNode(3)
+            pn.arAxesPlotSeriesCurSlice = pn.arAxesPlotChartNode.GetNthPlotSeriesNode(4)
+            pn.arAxesPlotSeriesShortDyn = pn.arAxesPlotChartNode.GetNthPlotSeriesNode(5)
+            pn.arAxesPlotSeriesLongDyn = pn.arAxesPlotChartNode.GetNthPlotSeriesNode(6)
+            # longDyn and shortDyn could possibly be switched here, but I think this is
+            # correct for backwards compatibility. New cases will not pass through this step
+
+            pn.csaPlotSeriesMaxCSA = pn.csaPlotChartNode.GetNthPlotSeriesNode(0)
+            pn.csaPlotSeriesMinCSA = pn.csaPlotChartNode.GetNthPlotSeriesNode(1)
+            pn.csaPlotSeriesCurSlice = pn.csaPlotChartNode.GetNthPlotSeriesNode(2)
+            pn.csaPlotSeriesDynCSA = pn.csaPlotChartNode.GetNthPlotSeriesNode(3)
         # Make sure segment list is initialized if there is an
         # initial segmentation sequence
         # self.onSegmentationSequenceSelectorChange(
@@ -960,22 +1024,42 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
         )
         # CSA
         csaDynTable = browser.GetProxyNode(pn.csaTableSeq)
-        pn.csaPlotChartNode = self.logic.makeCSAPlot(
+        (
+            pn.csaPlotChartNode,
+            pn.csaPlotSeriesMaxCSA,
+            pn.csaPlotSeriesMinCSA,
+            pn.csaPlotSeriesCurSlice,
+            pn.csaPlotSeriesDynCSA,
+        ) = self.logic.makeCSAPlot(
             envTable=pn.csaEnvTable,
             dynTable=csaDynTable,
             sliceIndicatorTable=pn.sliceIndicatorTable,
             plotChartNode=pn.csaPlotChartNode,
+            highSeries=pn.csaPlotSeriesMaxCSA,
+            lowSeries=pn.csaPlotSeriesMinCSA,
+            sliceSeries=pn.csaPlotSeriesCurSlice,
+            dynSeries=pn.csaPlotSeriesDynCSA,
         )
         # update progress bar
         progressBar.value = 1
         slicer.app.processEvents()
         # AR
         arDynTable = browser.GetProxyNode(pn.arTableSeq)
-        pn.arPlotChartNode = self.logic.makeARPlot(
+        (
+            pn.arPlotChartNode,
+            pn.arPlotSeriesMaxAR,
+            pn.arPlotSeriesMinAR,
+            pn.arPlotSeriesCurSlice,
+            pn.arPlotSeriesDynAR,
+        ) = self.logic.makeARPlot(
             envTable=pn.arEnvTable,
             dynTable=arDynTable,
             sliceIndicatorTable=pn.sliceIndicatorTable,
             plotChartNode=pn.arPlotChartNode,
+            highSeries=pn.arPlotSeriesMaxAR,
+            lowSeries=pn.arPlotSeriesMinAR,
+            sliceSeries=pn.arPlotSeriesCurSlice,
+            dynSeries=pn.arPlotSeriesDynAR,
         )
         # update progress bar
         progressBar.value = 2
@@ -983,7 +1067,16 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
         # AR_Axes
         dynTableLong = browser.GetProxyNode(pn.longTableSeq)
         dynTableShort = browser.GetProxyNode(pn.shortTableSeq)
-        pn.arAxesPlotChartNode = self.logic.makeARAxesPlot(
+        (
+            pn.arAxesPlotChartNode,
+            pn.arAxesPlotSeriesLongMax,
+            pn.arAxesPlotSeriesLongMin,
+            pn.arAxesPlotSeriesShortMax,
+            pn.arAxesPlotSeriesShortMin,
+            pn.arAxesPlotSeriesCurSlice,
+            pn.arAxesPlotSeriesLongDyn,
+            pn.arAxesPlotSeriesShortDyn,
+        ) = self.logic.makeARAxesPlot(
             envTableLong=pn.longEnvTable,
             dynTableLong=dynTableLong,
             envTableShort=pn.shortEnvTable,
@@ -998,6 +1091,14 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
         pn.volPlotChartNode = self.logic.makeAirVolumePlot(
             tableNode=pn.volTable, plotChartNode=pn.volPlotChartNode
         )
+        # TODO: Consider adding vs time plots?
+        # CSA/AR/LA/SA vs time for a specific SliceIdx
+        # To handle same as the vs dist plots, we would need
+        # to have a different browser node for SliceIdx.  It
+        # is probably better to have a table that we update on
+        # slice index change, or a plotSeries that we update the
+        # referred column of a static table.
+
         # close progress bar
         progressBar.value = nPlots
         slicer.app.processEvents()
@@ -1148,6 +1249,60 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
         # of slice and frame idxs match the requested ones, then
         # skip the update...) TODO
 
+    def onApplyYMaxCSAButtonClick(self):
+        """Set CSA plot y range to be zero to indicated maximum"""
+        pn = self._parameterNode
+        if not pn.csaPlotChartNode:
+            # No CSA plot to update
+            return
+        yRange = [0, pn.maxY_CSA]
+        self.logic.setPlotChartYRange(pn.csaPlotChartNode, yRange)
+
+    def onApplyXRangeButtonClick(self):
+        """Apply the chosen plotting range for X"""
+        pn = self._parameterNode
+        self.updateDistanceAxisLimits(
+            pn.carinaDistPlotRangeMm.minimum, pn.carinaDistPlotRangeMm.maximum
+        )
+
+    def onCarinaDistPlotRangeSliderChange(self, newMin, newMax):
+        """NO LONGER USED
+        *** Updated code uses apply button for x range update
+        rather than dynamic slider-based updates ***
+        Update the cutoff range of carina distance values plotted in plot series"""
+        pn = self._parameterNode
+        if not self.quantData:
+            return
+        if pn.updatingCarinaPlotRange:
+            return
+        # Avoid recursion
+        prior = pn.updatingCarinaPlotRange
+        pn.updatingCarinaPlotRange = True
+        # Perform updates
+        pn.carinaDistPlotRangeMm.setRange(newMin, newMax)
+        self.updateDistanceAxisLimits(newMin, newMax)
+        # self.updateTrimmedTables(newMinDist, newMaxDist)
+        slicer.app.processEvents()
+        # Done
+        pn.updatingCarinaPlotRange = prior  # should this be prior value or just False?
+
+    def updateDistanceAxisLimits(self, newMinDist, newMaxDist, flipAxis=True):
+        """Update the range of x values plotted"""
+        pn = self._parameterNode
+        newXRange = [newMaxDist, newMinDist] if flipAxis else [newMinDist, newMaxDist]
+        plotsToUpdate = [
+            p
+            for p in [pn.arAxesPlotChartNode, pn.csaPlotChartNode, pn.arPlotChartNode]
+            if p
+        ]
+        for plotChartNode in plotsToUpdate:
+            self.logic.setPlotChartXRange(plotChartNode, newXRange)
+
+    def updateCSAYAxisLimit(self, newMax):
+        """Update the y-axis maximum value for the CSA plot chart"""
+        pn = self._parameterNode
+        self.logic.setPlotChartYRange(pn.csaPlotChartNode, [0, newMax])
+
     def onSliceSliderValueChange(self, newSliceIdx):
         """Update the cross-section view model
         in 3D, as well as the aspect ratio axis lines
@@ -1198,6 +1353,8 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
         sliceNormal = quantData["sliceNormals"][sliceIdx, :]
         nR, nA, nS = (*sliceNormal,)
         self.ui.normalText.text = f"({nR:0.2f}, {nA:0.2f}, {nS:0.2f})"
+        carinaDist = self.getCurrentCarinaDistance()
+        self.ui.carinaDistText.text = f"{carinaDist:0.1f} mm"
 
     def getCarinaLocation(self):
         """Wrapper for logic.getCarinaLocation"""
@@ -1230,74 +1387,6 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
         pn = self._parameterNode
         pn.cline_InputSegmentID = newSegmentID
 
-    def onSegmentNameChanged(self, txt):
-        """In the multiframe section, triggered whenever the text in the segment
-        name selection combobox changes"""
-        segmentName, segmentFrames = (
-            self.logic.processSegmentSelectorTextToNameAndFrames(txt)
-        )
-        self._parameterNode.segmentName = segmentName
-        self._parameterNode.segmentFrames = segmentFrames
-
-    def onSegmentNameActivated(self, num):
-        """In the multiframe section, triggered whenever a choice is made in the
-        segment name selection combobox. I'm including this because I want a way
-        to trigger updating even if nothing supposedly changes.
-        """
-        txt = self.ui.segmentNameComboBox.currentText
-        self.onSegmentNameChanged(txt)
-
-    def onRunCSAButtonClick(self):
-        """Run cross-sectional analysis for all frames."""
-        pn = self._parameterNode
-        centerlineNode = pn.centerlineNode
-        segSeq = pn.segmentationSequence
-        segmentName = pn.segmentName
-        segmentFrames = pn.segmentFrames
-        outputTableSequence = pn.outputTableSequence
-        if outputTableSequence is None:
-            outputTableSequence = slicer.mrmlScene.AddNewNodeByClass(
-                "vtkMRMLSequenceNode", "CSA_TableSeq"
-            )
-            pn.outputTableSequence = outputTableSequence
-        # We should start with a clean slate even if there were prior tables
-        outputTableSequence.RemoveAllDataNodes()
-        self.logic.setCompatibleSeqIndexing(outputTableSequence, segSeq)
-
-        #
-        browserNode = (
-            slicer.modules.sequences.logic().GetFirstBrowserNodeForSequenceNode(segSeq)
-        )
-        nFrames = segSeq.GetNumberOfDataNodes()
-        if segmentFrames is None:
-            # all frames
-            frameIdxs = range(nFrames)
-        else:
-            # only certain frames
-            frameIdxs = [*segmentFrames]
-            slicer.util.warningDisplay(
-                "Sorry, this module currently only works for segments which are present in all frames!"
-            )
-            return
-        # Loop over frames
-        for frameIdx in frameIdxs:
-            browserNode.SetSelectedItemNumber(frameIdx)
-            lumenNode = browserNode.GetProxyNode(segSeq)
-            tempOutputTableNode = slicer.mrmlScene.AddNewNodeByClass(
-                "vtkMRMLTableNode", f"CSATableForFrame{frameIdx}"
-            )
-            self.logic.runCrossSectionalAnalysis(
-                centerlineNode, lumenNode, segmentName, tempOutputTableNode
-            )
-            indexValue = segSeq.GetNthIndexValue(frameIdx)
-            outputTableSequence.SetDataNodeAtValue(tempOutputTableNode, indexValue)
-            # Remove temp copy
-            slicer.mrmlScene.RemoveNode(tempOutputTableNode)
-            slicer.app.processEvents()
-        # Ensure outputTableSequence is linked to the browser node
-        if not browserNode.IsSynchronizedSequenceNode(outputTableSequence):
-            browserNode.AddSynchronizedSequenceNode(outputTableSequence)
-
     def onSaveOutputTablesButtonClick(self):
         """Save available and selected output tables to spreadsheet files."""
         pn = self._parameterNode
@@ -1310,65 +1399,6 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
                 pn.outputTableSequence
             )
             self.logic.saveMergedCsaTableNodeToFile(pn.mergedCSATableNode, saveDir)
-
-    def onMakeCSAPlotButtonClick(self):
-        """Make a plot of CSA profiles including envelope (max/min) values and
-        a line which moves with the browser frame
-        """
-        pn = self._parameterNode
-        csaSeqNode = pn.outputTableSequence
-        if csaSeqNode is None:
-            slicer.util.warningDialog(
-                "No CSA Table Sequence Selected; can't make plot!"
-            )
-            return
-        mergedTableNode = pn.mergedCSATableNode
-        if mergedTableNode is None:
-            mergedTableNode = self.logic.consolidateCSATables(csaSeqNode)
-            pn.mergedCSATableNode = mergedTableNode
-        chartNode, (lowSer, highSer, dynSer) = self.logic.makeDynamicPlotChart(
-            mergedTableNode=mergedTableNode, csaSeqNode=csaSeqNode
-        )
-        # Show this in the application
-        showPlotLayoutNum = 36
-        slicer.app.layoutManager().setLayout(showPlotLayoutNum)
-        plotViewNode = slicer.mrmlScene.GetFirstNodeByClass("vtkMRMLPlotViewNode")
-        plotViewNode.SetPlotChartNodeID(chartNode.GetID())
-
-    def onSegmentationSequenceSelectorChange(self, newNode):
-        """User changed selection of segmentation sequence node.  The
-        list of options on the segment selection list must be updated
-        to match those avaiilable in the newly selected sequence
-        """
-        print(f"New segSeq is named {newNode.GetName() if newNode else 'NONE'}")
-        self._parameterNode.segmentationSequence = newNode
-        self.updateSegmentListSelector(newNode)
-
-    def updateSegmentListSelector(self, newSegmentationSequenceNode):
-        """Update the segment selector list based on the supplied
-        segmentation sequence node.  If empty, clear the options."""
-        if newSegmentationSequenceNode is None:
-            self.ui.segmentNameComboBox.clear()
-            return
-        segmentsList, partialSegmentDict = self.logic.getSegmentInfoFromSequence(
-            newSegmentationSequenceNode
-        )
-        # Build the selector list of options from the outputs
-        optionStrings = self.logic.buildOptionStrings(segmentsList, partialSegmentDict)
-        # Update the segment chooser combobox widget
-        self.logic.updateComboBoxOptions(self.ui.segmentNameComboBox, optionStrings)
-
-    def onVolumeLimitingSegmentationSelectionChange(self, newSegNode):
-        """Triggered when new segmentation node is selected on the
-        volume limiting segmentation selection widget.
-        """
-        self._parameterNode.volumeLimitingSegmentationNode = newSegNode
-
-    def onVolumeLimitingSegmentSelectionChange(self, newSegmentID):
-        """Triggered when new segment is selected on the volume
-        limiting segment selector widget.
-        """
-        self._parameterNode.volumeLimitingSegmentID = newSegmentID
 
     def cleanup(self) -> None:
         """Called when the application closes and the module widget is destroyed."""
@@ -1481,6 +1511,10 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
         are present
         """
         pn = self._parameterNode
+        # OK this function is called whenever the parameter node is modified
+        # It should be safe to use it to control plot or model visibility
+        self.updateVisiblity()
+
         return  # TODO: do some enabling and collapsing here...
         # Run CSA Analysis Button
         if pn and pn.centerlineNode and pn.segmentationSequence and pn.segmentName:
@@ -1527,6 +1561,110 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
             self.ui.makeCSAPlotButton.toolTip = _(
                 "Run CSA analysis to enable plotting of results!"
             )
+
+    def updateVisiblity(self):
+        """Make plot item visibility consistent with parameter node values. Also
+        control the current slice visibility and AR lines visibility
+        """
+        pn = self._parameterNode
+        # Skip if no plots yet
+        if not pn.csaPlotChartNode or not pn.csaPlotSeriesDynCSA:
+            return
+        # If dynamic curves are hidden, then should envelope curves be solid lines?
+        csaCurvesToShow = [
+            pn.csaPlotSeriesMaxCSA,
+            pn.csaPlotSeriesMinCSA,
+            pn.csaPlotSeriesCurSlice,
+            pn.csaPlotSeriesDynCSA,
+        ]
+        arCurvesToShow = [
+            pn.arPlotSeriesMaxAR,
+            pn.arPlotSeriesMinAR,
+            pn.arPlotSeriesCurSlice,
+            pn.arPlotSeriesDynAR,
+        ]
+        arAxesCurvesToShow = [
+            pn.arAxesPlotSeriesLongMax,
+            pn.arAxesPlotSeriesLongMin,
+            pn.arAxesPlotSeriesShortMax,
+            pn.arAxesPlotSeriesShortMin,
+            pn.arAxesPlotSeriesCurSlice,
+            pn.arAxesPlotSeriesLongDyn,
+            pn.arAxesPlotSeriesShortDyn,
+        ]
+        if not pn.showEnvCurvesFlag:
+            csaCurvesToShow.remove(pn.csaPlotSeriesMaxCSA)
+            csaCurvesToShow.remove(pn.csaPlotSeriesMinCSA)
+            arCurvesToShow.remove(pn.arPlotSeriesMaxAR)
+            arCurvesToShow.remove(pn.arPlotSeriesMinAR)
+            arAxesCurvesToShow.remove(pn.arAxesPlotSeriesLongMax)
+            arAxesCurvesToShow.remove(pn.arAxesPlotSeriesLongMin)
+            arAxesCurvesToShow.remove(pn.arAxesPlotSeriesShortMax)
+            arAxesCurvesToShow.remove(pn.arAxesPlotSeriesShortMin)
+        else:
+            # Show them dashed or solid depending on whether the current curve is shown
+            if pn.showCurrentCurveFlag:
+                envLineStyle = vtkMRMLPlotSeriesNode.LineStyleDash
+            else:
+                envLineStyle = vtkMRMLPlotSeriesNode.LineStyleSolid
+            envCurves = [
+                pn.csaPlotSeriesMaxCSA,
+                pn.csaPlotSeriesMinCSA,
+                pn.arPlotSeriesMaxAR,
+                pn.arPlotSeriesMinAR,
+                pn.arAxesPlotSeriesLongMax,
+                pn.arAxesPlotSeriesLongMin,
+                pn.arAxesPlotSeriesShortMax,
+                pn.arAxesPlotSeriesShortMin,
+            ]
+            for envCurve in envCurves:
+                envCurve.SetLineStyle(envLineStyle)
+        if not pn.showCurrentCurveFlag:
+            # Hide dynamic curves
+            csaCurvesToShow.remove(pn.csaPlotSeriesDynCSA)
+            arCurvesToShow.remove(pn.arPlotSeriesDynAR)
+            arAxesCurvesToShow.remove(pn.arAxesPlotSeriesLongDyn)
+            arAxesCurvesToShow.remove(pn.arAxesPlotSeriesShortDyn)
+        if not pn.showSliceIndicatorOnPlotsFlag:
+            csaCurvesToShow.remove(pn.csaPlotSeriesCurSlice)
+            arCurvesToShow.remove(pn.arPlotSeriesCurSlice)
+            arAxesCurvesToShow.remove(pn.arAxesPlotSeriesCurSlice)
+        if (
+            not pn.showEnvCurvesFlag
+            and not pn.showSliceIndicatorOnPlotsFlag
+            and not pn.showCurrentCurveFlag
+        ):
+            # If everything is unchecked, show the dynamic curve to avoid empty plots
+            csaCurvesToShow = [pn.csaPlotSeriesDynCSA]
+            arCurvesToShow = [pn.arPlotSeriesDynAR]
+            arAxesCurvesToShow = [
+                pn.arAxesPlotSeriesLongDyn,
+                pn.arAxesPlotSeriesShortDyn,
+            ]
+        # Legend visibility
+        for plotChart in [
+            pn.csaPlotChartNode,
+            pn.arPlotChartNode,
+            pn.arAxesPlotChartNode,
+            pn.volPlotChartNode,
+        ]:
+            plotChart.SetLegendVisibility(pn.showLegendFlag)
+        # Rebuild plots
+        pn.csaPlotChartNode.RemoveAllPlotSeriesNodeIDs()
+        for series in csaCurvesToShow:
+            pn.csaPlotChartNode.AddAndObservePlotSeriesNodeID(series.GetID())
+        pn.arPlotChartNode.RemoveAllPlotSeriesNodeIDs()
+        for series in arCurvesToShow:
+            pn.arPlotChartNode.AddAndObservePlotSeriesNodeID(series.GetID())
+        pn.arAxesPlotChartNode.RemoveAllPlotSeriesNodeIDs()
+        for series in arAxesCurvesToShow:
+            pn.arAxesPlotChartNode.AddAndObservePlotSeriesNodeID(series.GetID())
+
+        # Current slice cross section model visibility
+        pn.crossSectionModel.GetDisplayNode().SetVisibility(pn.showCurrentSlice3DFlag)
+        # Axis line visibility in 3D
+        pn.longAxisLine.GetDisplayNode().SetVisibility(pn.showARLinesFlag)
+        pn.shortAxisLine.GetDisplayNode().SetVisibility(pn.showARLinesFlag)
 
 
 #
@@ -1627,6 +1765,7 @@ class DynamicMalaciaToolsLogic(ScriptedLoadableModuleLogic):
             xColName="TimeSec",
             yColName="Volume_mm3",
             plotSeriesName="AirVolume mm^3",
+            lineWidth=3,
         )
         plotChartNode.AddAndObservePlotSeriesNodeID(volSeries.GetID())
         plotChartNode.SetYAxisTitle("Air Volume (mm^3)")
@@ -1634,7 +1773,17 @@ class DynamicMalaciaToolsLogic(ScriptedLoadableModuleLogic):
         plotChartNode.SetTitle("Airway Volume vs Time")
         return plotChartNode
 
-    def makeCSAPlot(self, envTable, dynTable, sliceIndicatorTable, plotChartNode=None):
+    def makeCSAPlot(
+        self,
+        envTable,
+        dynTable,
+        sliceIndicatorTable,
+        plotChartNode=None,
+        lowSeries=None,
+        highSeries=None,
+        sliceSeries=None,
+        dynSeries=None,
+    ):
         """Make (or update) a dynamic plot node for CSA.
         This involves creating several plotSeriesNodes:
          * low, high envelopes (dist vs data)
@@ -1662,6 +1811,7 @@ class DynamicMalaciaToolsLogic(ScriptedLoadableModuleLogic):
             lineStyle=self.ENV_LINE_STYLE,
             color=self.ENV_CURVE_COLOR,
             lineWidth=self.ENV_LINE_WIDTH,
+            outputPlotSeries=lowSeries,
         )
         highSeries = self.makePlotSeries(
             tableNode=envTable,
@@ -1671,6 +1821,7 @@ class DynamicMalaciaToolsLogic(ScriptedLoadableModuleLogic):
             lineStyle=self.ENV_LINE_STYLE,
             color=self.ENV_CURVE_COLOR,
             lineWidth=self.ENV_LINE_WIDTH,
+            outputPlotSeries=highSeries,
         )
         dynSeries = self.makePlotSeries(
             tableNode=dynTable,
@@ -1679,8 +1830,9 @@ class DynamicMalaciaToolsLogic(ScriptedLoadableModuleLogic):
             plotSeriesName="CSA",
             color=self.DYN_CURVE_COLOR,
             lineWidth=self.DYN_LINE_WIDTH,
+            outputPlotSeries=dynSeries,
         )
-        sliceIndicatorSeries = self.makePlotSeries(
+        sliceSeries = self.makePlotSeries(
             tableNode=sliceIndicatorTable,
             xColName="CurrentSlice",
             yColName="CSA_Range",
@@ -1688,11 +1840,12 @@ class DynamicMalaciaToolsLogic(ScriptedLoadableModuleLogic):
             color=self.SLICE_INDICATOR_COLOR,
             lineStyle=self.SLICE_INDICATOR_LINE_STYLE,
             lineWidth=self.SLICE_INDICATOR_LINE_WIDTH,
+            outputPlotSeries=sliceSeries,
         )
         # TODO: consider adding a series which puts a marker
         # at the point with the lowest minimum CSA... (could
         # be added to sliceIndicatorTable for data storage)
-        seriesList = [highSeries, lowSeries, sliceIndicatorSeries, dynSeries]
+        seriesList = [highSeries, lowSeries, sliceSeries, dynSeries]
         for series in seriesList:
             plotChartNode.AddAndObservePlotSeriesNodeID(series.GetID())
         # Set up axes labels
@@ -1711,9 +1864,32 @@ class DynamicMalaciaToolsLogic(ScriptedLoadableModuleLogic):
         plotChartNode.SetTitle("CSA along Airway")
         # grid (SetGridVisibility())
         # legend (SetLegendVisibility()), etc.
-        return plotChartNode
+        return plotChartNode, highSeries, lowSeries, sliceSeries, dynSeries
 
-    def makeARPlot(self, envTable, dynTable, sliceIndicatorTable, plotChartNode=None):
+    def setPlotChartXRange(self, plotChartNode, newXRange: List[float]):
+        """Force a plotting x axis range. Note that if the first
+        element of the range is greater than the second, the x-axis
+        will be reversed.
+        """
+        plotChartNode.SetXAxisRangeAuto(False)
+        plotChartNode.SetXAxisRange(*newXRange)
+
+    def setPlotChartYRange(self, plotChartNode, newYRange: List[float]):
+        """Force a plotting y axis range."""
+        plotChartNode.SetYAxisRangeAuto(False)
+        plotChartNode.SetYAxisRange(*newYRange)
+
+    def makeARPlot(
+        self,
+        envTable,
+        dynTable,
+        sliceIndicatorTable,
+        plotChartNode=None,
+        highSeries=None,
+        lowSeries=None,
+        sliceSeries=None,
+        dynSeries=None,
+    ):
         """Make (or update) a dynamic plot node for AR.
         This involves creating several plotSeriesNodes:
          * low, high envelopes (dist vs data)
@@ -1741,6 +1917,7 @@ class DynamicMalaciaToolsLogic(ScriptedLoadableModuleLogic):
             lineStyle=self.ENV_LINE_STYLE,
             color=self.ENV_CURVE_COLOR,
             lineWidth=self.ENV_LINE_WIDTH,
+            outputPlotSeries=lowSeries,
         )
         highSeries = self.makePlotSeries(
             tableNode=envTable,
@@ -1750,6 +1927,7 @@ class DynamicMalaciaToolsLogic(ScriptedLoadableModuleLogic):
             lineStyle=self.ENV_LINE_STYLE,
             color=self.ENV_CURVE_COLOR,
             lineWidth=self.ENV_LINE_WIDTH,
+            outputPlotSeries=highSeries,
         )
         dynSeries = self.makePlotSeries(
             tableNode=dynTable,
@@ -1758,8 +1936,9 @@ class DynamicMalaciaToolsLogic(ScriptedLoadableModuleLogic):
             plotSeriesName="AR",
             color=self.DYN_CURVE_COLOR,
             lineWidth=self.DYN_LINE_WIDTH,
+            outputPlotSeries=dynSeries,
         )
-        sliceIndicatorSeries = self.makePlotSeries(
+        sliceSeries = self.makePlotSeries(
             tableNode=sliceIndicatorTable,
             xColName="CurrentSlice",
             yColName="AR_Range",
@@ -1767,11 +1946,12 @@ class DynamicMalaciaToolsLogic(ScriptedLoadableModuleLogic):
             color=self.SLICE_INDICATOR_COLOR,
             lineStyle=self.SLICE_INDICATOR_LINE_STYLE,
             lineWidth=self.SLICE_INDICATOR_LINE_WIDTH,
+            outputPlotSeries=sliceSeries,
         )
         # TODO: consider adding a series which puts a marker
         # at the point with the lowest minimum CSA... (could
         # be added to sliceIndicatorTable for data storage)
-        seriesList = [highSeries, lowSeries, sliceIndicatorSeries, dynSeries]
+        seriesList = [highSeries, lowSeries, sliceSeries, dynSeries]
         for series in seriesList:
             plotChartNode.AddAndObservePlotSeriesNodeID(series.GetID())
         # Set up axes labels
@@ -1792,7 +1972,7 @@ class DynamicMalaciaToolsLogic(ScriptedLoadableModuleLogic):
         plotChartNode.SetTitle("Aspect Ratio along Airway")
         # grid (SetGridVisibility())
         # legend (SetLegendVisibility()), etc.
-        return plotChartNode
+        return plotChartNode, highSeries, lowSeries, sliceSeries, dynSeries
 
     def makeARAxesPlot(
         self,
@@ -1802,6 +1982,13 @@ class DynamicMalaciaToolsLogic(ScriptedLoadableModuleLogic):
         dynTableShort,
         sliceIndicatorTable,
         plotChartNode=None,
+        highSeriesLong=None,
+        lowSeriesLong=None,
+        highSeriesShort=None,
+        lowSeriesShort=None,
+        sliceSeries=None,
+        dynSeriesLong=None,
+        dynSeriesShort=None,
     ):
         """Make (or update) a dynamic plot node for AR Axes.
         This involves creating several plotSeriesNodes for each axis:
@@ -1874,7 +2061,7 @@ class DynamicMalaciaToolsLogic(ScriptedLoadableModuleLogic):
             color=self.SHORT_COLOR,
             lineWidth=self.DYN_LINE_WIDTH,
         )
-        sliceIndicatorSeries = self.makePlotSeries(
+        sliceSeries = self.makePlotSeries(
             tableNode=sliceIndicatorTable,
             xColName="CurrentSlice",
             yColName="AxesLengthRange",
@@ -1891,9 +2078,9 @@ class DynamicMalaciaToolsLogic(ScriptedLoadableModuleLogic):
             lowSeriesLong,
             highSeriesShort,
             lowSeriesShort,
-            sliceIndicatorSeries,
-            dynSeriesShort,
+            sliceSeries,
             dynSeriesLong,
+            dynSeriesShort,
         ]
         for series in seriesList:
             plotChartNode.AddAndObservePlotSeriesNodeID(series.GetID())
@@ -1913,7 +2100,7 @@ class DynamicMalaciaToolsLogic(ScriptedLoadableModuleLogic):
         # TODO: consider adding overall title (SetTitle()),
         # grid (SetGridVisibility())
         # legend (SetLegendVisibility()), etc.
-        return plotChartNode
+        return plotChartNode, *seriesList
 
     def makePlotSeries(
         self,
