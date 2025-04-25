@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>547</width>
-    <height>1694</height>
+    <height>1722</height>
    </rect>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
@@ -26,6 +26,12 @@
       </item>
       <item row="0" column="1">
        <widget class="qMRMLNodeComboBox" name="origImageSequenceNodeSelector">
+        <property name="maximumSize">
+         <size>
+          <width>300</width>
+          <height>16777215</height>
+         </size>
+        </property>
         <property name="nodeTypes">
          <stringlist notr="true">
           <string>vtkMRMLSequenceNode</string>
@@ -54,6 +60,12 @@
       </item>
       <item row="1" column="1">
        <widget class="QDoubleSpinBox" name="temporalStepSpinBox">
+        <property name="maximumSize">
+         <size>
+          <width>300</width>
+          <height>16777215</height>
+         </size>
+        </property>
         <property name="alignment">
          <set>Qt::AlignCenter</set>
         </property>
@@ -99,6 +111,12 @@
       </item>
       <item row="4" column="1">
        <widget class="qMRMLNodeComboBox" name="croppedImageSequenceSelector">
+        <property name="maximumSize">
+         <size>
+          <width>300</width>
+          <height>16777215</height>
+         </size>
+        </property>
         <property name="nodeTypes">
          <stringlist notr="true">
           <string>vtkMRMLSequenceNode</string>
@@ -127,6 +145,12 @@
       </item>
       <item row="5" column="1">
        <widget class="qMRMLNodeComboBox" name="minIPSelector">
+        <property name="maximumSize">
+         <size>
+          <width>300</width>
+          <height>16777215</height>
+         </size>
+        </property>
         <property name="nodeTypes">
          <stringlist notr="true">
           <string>vtkMRMLScalarVolumeNode</string>
@@ -155,6 +179,12 @@
       </item>
       <item row="6" column="1">
        <widget class="qMRMLNodeComboBox" name="minIPSegmentationSelector">
+        <property name="maximumSize">
+         <size>
+          <width>300</width>
+          <height>16777215</height>
+         </size>
+        </property>
         <property name="nodeTypes">
          <stringlist notr="true">
           <string>vtkMRMLSegmentationNode</string>
@@ -188,6 +218,12 @@
        <layout class="QHBoxLayout" name="horizontalLayout_4">
         <item>
          <widget class="qMRMLNodeComboBox" name="initialCropBoxSelector">
+          <property name="maximumSize">
+           <size>
+            <width>200</width>
+            <height>16777215</height>
+           </size>
+          </property>
           <property name="nodeTypes">
            <stringlist notr="true">
             <string>vtkMRMLMarkupsROINode</string>
@@ -225,6 +261,12 @@
       </item>
       <item row="9" column="1">
        <widget class="qMRMLNodeComboBox" name="airwaySegmentationSequenceSelector">
+        <property name="maximumSize">
+         <size>
+          <width>300</width>
+          <height>16777215</height>
+         </size>
+        </property>
         <property name="nodeTypes">
          <stringlist notr="true">
           <string>vtkMRMLSegmentationNode</string>
@@ -286,6 +328,12 @@
       </item>
       <item row="0" column="1">
        <widget class="qMRMLNodeComboBox" name="carinaLocationsSeqSelector">
+        <property name="maximumSize">
+         <size>
+          <width>300</width>
+          <height>16777215</height>
+         </size>
+        </property>
         <property name="nodeTypes">
          <stringlist notr="true">
           <string>vtkMRMLSequenceNode</string>
@@ -324,6 +372,12 @@
       </item>
       <item row="3" column="1">
        <widget class="qMRMLNodeComboBox" name="carinaAlignmentTransformSeqSelector">
+        <property name="maximumSize">
+         <size>
+          <width>300</width>
+          <height>16777215</height>
+         </size>
+        </property>
         <property name="nodeTypes">
          <stringlist notr="true">
           <string>vtkMRMLSequenceNode</string>
@@ -362,6 +416,12 @@
       </item>
       <item row="6" column="1">
        <widget class="qMRMLNodeComboBox" name="alignedMinIPImageSelector">
+        <property name="maximumSize">
+         <size>
+          <width>300</width>
+          <height>16777215</height>
+         </size>
+        </property>
         <property name="nodeTypes">
          <stringlist notr="true">
           <string>vtkMRMLScalarVolumeNode</string>
@@ -393,6 +453,12 @@
       </item>
       <item row="8" column="1">
        <widget class="qMRMLNodeComboBox" name="alignedMinIPSegmentationSelector">
+        <property name="maximumSize">
+         <size>
+          <width>300</width>
+          <height>16777215</height>
+         </size>
+        </property>
         <property name="nodeTypes">
          <stringlist notr="true">
           <string>vtkMRMLSegmentationNode</string>
@@ -437,6 +503,12 @@
        <layout class="QHBoxLayout" name="horizontalLayout_5">
         <item>
          <widget class="qMRMLNodeComboBox" name="alignedCropBoxSelector">
+          <property name="maximumSize">
+           <size>
+            <width>200</width>
+            <height>16777215</height>
+           </size>
+          </property>
           <property name="nodeTypes">
            <stringlist notr="true">
             <string>vtkMRMLMarkupsROINode</string>
@@ -490,6 +562,12 @@
       </item>
       <item row="0" column="1">
        <widget class="qMRMLNodeComboBox" name="centerlineInputSurfaceSelector">
+        <property name="maximumSize">
+         <size>
+          <width>300</width>
+          <height>16777215</height>
+         </size>
+        </property>
         <property name="nodeTypes">
          <stringlist notr="true">
           <string>vtkMRMLModelNode</string>
@@ -534,6 +612,12 @@
        <layout class="QHBoxLayout" name="horizontalLayout_2">
         <item>
          <widget class="qMRMLNodeComboBox" name="endPointsMarkupsSelector">
+          <property name="maximumSize">
+           <size>
+            <width>200</width>
+            <height>16777215</height>
+           </size>
+          </property>
           <property name="nodeTypes">
            <stringlist notr="true">
             <string>vtkMRMLMarkupsFiducialNode</string>
@@ -570,6 +654,12 @@
       </item>
       <item row="3" column="1">
        <widget class="QDoubleSpinBox" name="doubleSpinBox">
+        <property name="maximumSize">
+         <size>
+          <width>300</width>
+          <height>16777215</height>
+         </size>
+        </property>
         <property name="alignment">
          <set>Qt::AlignCenter</set>
         </property>
@@ -626,6 +716,12 @@
       </item>
       <item row="0" column="1">
        <widget class="qMRMLNodeComboBox" name="q_airwaySegmentationsSelector">
+        <property name="maximumSize">
+         <size>
+          <width>300</width>
+          <height>16777215</height>
+         </size>
+        </property>
         <property name="nodeTypes">
          <stringlist notr="true">
           <string>vtkMRMLSequenceNode</string>
@@ -647,6 +743,12 @@
       </item>
       <item row="1" column="1">
        <widget class="qMRMLNodeComboBox" name="q_centerlineSelector">
+        <property name="maximumSize">
+         <size>
+          <width>300</width>
+          <height>16777215</height>
+         </size>
+        </property>
         <property name="nodeTypes">
          <stringlist notr="true">
           <string>vtkMRMLMarkupsCurveNode</string>
@@ -670,6 +772,12 @@
        <layout class="QHBoxLayout" name="horizontalLayout">
         <item>
          <widget class="qMRMLNodeComboBox" name="volumeQuantificationBoxSelector">
+          <property name="maximumSize">
+           <size>
+            <width>200</width>
+            <height>16777215</height>
+           </size>
+          </property>
           <property name="nodeTypes">
            <stringlist notr="true"/>
           </property>
@@ -888,6 +996,12 @@
       </item>
       <item row="16" column="1">
        <widget class="ctkPathLineEdit" name="saveDirPathEdit">
+        <property name="maximumSize">
+         <size>
+          <width>300</width>
+          <height>16777215</height>
+         </size>
+        </property>
         <property name="filters">
          <set>ctkPathLineEdit::Dirs|ctkPathLineEdit::NoDot|ctkPathLineEdit::NoDotDot</set>
         </property>
