@@ -758,8 +758,38 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
         pn.q_smoothedCenterline = pn.smoothCenterline
 
     def onSaveResultsButtonClick(self):
-        """Save quantitative results tables to files"""
-        raise NotImplementedError
+        """Save quantitative results tables to files. Does not save
+        the full scene to avoid duplicating the often very large image
+        file sequences. Existing results in this location are overwritten
+        without warning.
+
+        If the user wants to preserve everything, saving
+        the scene as .mrb before exiting Slicer is the preferred mechanism.
+        """
+        pn = self._parameterNode
+        saveDir = pn.saveDirectory
+        fileNameTuples = (
+            (pn.csaTable, "CSA_table.csv"),
+            (pn.arTable, "AR_table.csv"),
+            (pn.slicingInfoTable, "SlicingInfo_table.csv"),
+            (pn.volTable, "AirwayVolumes_table.csv"),
+        )
+        try:
+            for dataNode, filename in fileNameTuples:
+                filePath = pathlib.Path(saveDir, filename)
+                slicer.util.exportNode(dataNode, filePath)
+        except Exception as e:
+            slicer.util.warningDisplay(
+                "Warning, error encountered while saving! Check error log for more details."
+            )
+            raise e
+        logging.info(f'Quantitative results tables sucessfully saved to "{saveDir}"!')
+        # Delete the unnecessary and confusing "schema" csv files which are
+        # automatically created when exporting or saving table nodes
+        for _, filename in fileNameTuples:
+            schemaFileName = "".join([filename[:-3], "schema.", filename[-3:]])
+            schemaFilePath = pathlib.Path(saveDir, schemaFileName)
+            schemaFilePath.unlink()
 
     def getQuantDataFromJson(self):
         """Recover the quantData from stored json string in parameter node"""
