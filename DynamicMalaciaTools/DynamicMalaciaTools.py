@@ -761,13 +761,20 @@ class DynamicMalaciaToolsWidget(ScriptedLoadableModuleWidget, VTKObservationMixi
         """Save quantitative results tables to files. Does not save
         the full scene to avoid duplicating the often very large image
         file sequences. Existing results in this location are overwritten
-        without warning.
+        without warning. Also captures a screenshot of the current view.
 
         If the user wants to preserve everything, saving
         the scene as .mrb before exiting Slicer is the preferred mechanism.
         """
         pn = self._parameterNode
         saveDir = pn.saveDirectory
+        ### Get screen capture
+        import ScreenCapture
+
+        cap = ScreenCapture.ScreenCaptureLogic()
+        capturePathName = pathlib.Path(saveDir, "ScreenCapture.png")
+        cap.captureImageFromView(None, capturePathName)
+        ### Save table files
         fileNameTuples = (
             (pn.csaTable, "CSA_table.csv"),
             (pn.arTable, "AR_table.csv"),
